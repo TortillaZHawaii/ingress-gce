@@ -640,6 +640,29 @@ func GetProtocol(svcPorts []api_v1.ServicePort) api_v1.Protocol {
 	return svcPorts[0].Protocol
 }
 
+// For mixed service ports we want to create UNSPECIFIED backend service.
+// If there are only protocols of one type return that type.
+//
+// See https://cloud.google.com/load-balancing/docs/internal#forwarding-rule-protocols
+func GetBackendProtocol(svcPorts []api_v1.ServicePort) string {
+	protocolSet := make(map[api_v1.Protocol]struct{})
+	for _, port := range svcPorts {
+		protocolSet[port.Protocol] = struct{}{}
+	}
+
+	_, okTCP := protocolSet[api_v1.ProtocolTCP]
+	_, okUDP := protocolSet[api_v1.ProtocolUDP]
+
+	switch {
+	case okTCP && okUDP:
+		return "UNSPECIFIED"
+	case okUDP:
+		return string(api_v1.ProtocolUDP)
+	default:
+		return string(api_v1.ProtocolTCP)
+	}
+}
+
 func GetPorts(svcPorts []api_v1.ServicePort) []string {
 	ports := []string{}
 	for _, p := range svcPorts {

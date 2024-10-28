@@ -382,6 +382,7 @@ func (b *Backends) EnsureL4BackendService(params L4BackendServiceParams, beLogge
 	// Create backend service if none was found
 	if currentBS == nil {
 		beLogger.V(2).Info("EnsureL4BackendService: creating backend service")
+		// BS creation
 		err := composite.CreateBackendService(b.cloud, key, expectedBS, beLogger)
 		if err != nil {
 			return nil, utils.ResourceResync, err

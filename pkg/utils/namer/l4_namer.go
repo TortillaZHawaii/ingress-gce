@@ -118,6 +118,20 @@ func (namer *L4Namer) L4ForwardingRule(namespace, name, protocol string) string 
 	}, "-")
 }
 
+// L4ForwardingRulesRegex returns the regex that matches L4 forwarding rules using different protocols created with L4ForwardingRule.
+//
+// Warning: trimmed namespace might match 
+func (namer *L4Namer) L4ForwardingRulesRegex(namespace, name string) string {
+	// Forwarding rules can have 3 different protocols:
+	// * TCP
+	// * UDP
+	// * L3_DEFAULT
+	// While we currently don't use L3_DEFAULT it's a longer string compared to TCP/UDP which have len() equal to 3.
+	// This means our REGEX has to account for that, as trimmedNamespacedName could be different for TCP/UDP and L3_DEFAULT,
+	protocols := []string{"tcp", "udp", "l3_default"}
+	
+}
+
 // L4HealthCheck returns the name of the L4 LB Healthcheck
 func (namer *L4Namer) L4HealthCheck(namespace, name string, shared bool) string {
 	if shared {

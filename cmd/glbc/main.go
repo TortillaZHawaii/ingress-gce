@@ -82,7 +82,7 @@ func main() {
 	}
 
 	rootLogger := klog.TODO()
-	rootLogger.V(0).Info("Starting GLBC image", "version", version.Version, "clusterName", flags.F.ClusterName)
+	rootLogger.V(0).Info("Starting brand new GLBC image", "version", version.Version, "clusterName", flags.F.ClusterName)
 	rootLogger.V(0).Info(fmt.Sprintf("Latest commit hash: %q", version.GitCommit))
 	for i, a := range os.Args {
 		rootLogger.V(0).Info(fmt.Sprintf("argv[%d]: %q", i, a))
@@ -198,6 +198,7 @@ func main() {
 		}
 	}
 
+	// START Does it do anything??
 	namer, err := app.NewNamer(kubeClient, flags.F.ClusterName, firewalls.DefaultFirewallName, rootLogger)
 	if err != nil {
 		klog.Fatalf("app.NewNamer(ctx.KubeClient, %q, %q) = %v", flags.F.ClusterName, firewalls.DefaultFirewallName, err)
@@ -205,6 +206,7 @@ func main() {
 	if namer.UID() != "" {
 		rootLogger.V(0).Info(fmt.Sprintf("Cluster name: %+v", namer.UID()))
 	}
+	// END
 
 	// Get kube-system UID that will be used for v2 frontend naming scheme.
 	kubeSystemNS, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), "kube-system", metav1.GetOptions{})

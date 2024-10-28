@@ -64,7 +64,7 @@ type L4 struct {
 	Service                          *corev1.Service
 	ServicePort                      utils.ServicePort
 	NamespacedName                   types.NamespacedName
-	forwardingRules                  ForwardingRulesProvider
+	// forwardingRules                  ForwardingRulesProvider
 	healthChecks                     healthchecksl4.L4HealthChecks
 	enableDualStack                  bool
 	network                          network.NetworkInfo
@@ -242,8 +242,7 @@ func (l4 *L4) deleteIPv4ResourcesAnnotationBased(result *L4ILBSyncResult, should
 
 	// Deleting non-existent address do not print error audit logs, and we don't store address in annotations
 	// that's why we can delete it without checking annotation
-	err := l4.deleteIPv4Address()
-	if err != nil {
+	if err := l4.deleteIPv4Address(); err != nil {
 		l4.svcLogger.Error(err, "Failed to delete address for internal loadbalancer service")
 		result.Error = err
 		result.GCEResourceInError = annotations.AddressResource
@@ -394,7 +393,7 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 	}
 
 	// Reserve existing IP address before making any changes
-	var existingIPv4FR *composite.ForwardingRule
+	var existingIPv4FR []composite.ForwardingRule
 	var ipv4AddressToUse string
 	if !l4.enableDualStack || utils.NeedsIPv4(l4.Service) {
 		existingIPv4FR, err = l4.getOldIPv4ForwardingRule(existingBS)
@@ -461,7 +460,9 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 	}
 
 	servicePorts := l4.Service.Spec.Ports
-	protocol := utils.GetProtocol(servicePorts)
+	protocol := utils.GetBackendProtocol(servicePorts)
+
+	l4.svcLogger.Info("Protocol chosen for the svc", "protocol", protocol)
 
 	// if Service protocol changed, we must delete forwarding rule before changing backend service,
 	// otherwise, on updating backend service, google cloud api will return error
@@ -694,6 +695,7 @@ func (l4 *L4) hasAnnotation(annotationKey string) bool {
 // getOldIPv4ForwardingRule returns old IPv4 forwarding rule, with checking backend service protocol, if it exists.
 // This is useful when switching protocols of the service,
 // because forwarding rule name depends on the protocol, and we need to get forwarding rule from the old protocol name.
+// Can't use it directly since the protocol for mixed will be UNDEFINED which is different from TCP/UDP for each rule
 func (l4 *L4) getOldIPv4ForwardingRule(existingBS *composite.BackendService) (*composite.ForwardingRule, error) {
 	servicePorts := l4.Service.Spec.Ports
 	protocol := utils.GetProtocol(servicePorts)
@@ -709,21 +711,19 @@ func (l4 *L4) getOldIPv4ForwardingRule(existingBS *composite.BackendService) (*c
 // determineBackendServiceLocalityPolicy returns the locality policy to be used for the backend service of the internal load balancer.
 func (l4 *L4) determineBackendServiceLocalityPolicy() backends.LocalityLBPolicyType {
 	// If the service has weighted load balancing enabled, the locality policy will be WEIGHTED_MAGLEV.
-	if l4.enableWeightedLB {
-		if annotations.HasWeightedLBPodsPerNodeAnnotation(l4.Service) {
-			if l4.Service.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal {
-				// If the service has the annotation "networking.gke.io/weighted-load-balancing = pods-per-node"
-				// and the external traffic policy is local, weighted load balancing is enabled and the backend
-				// service locality policy is set to WEIGHTED_MAGLEV.
-				return backends.LocalityLBPolicyWeightedMaglev
-			} else {
-				// If the service has the annotation "networking.gke.io/weighted-load-balancing = pods-per-node"
-				// and the external traffic policy is cluster, weighted load balancing is not enabled.
-				l4.recorder.Eventf(l4.Service, corev1.EventTypeWarning, "UnsupportedConfiguration",
-					"Weighted load balancing by pods-per-node has no effect with External Traffic Policy: Cluster.")
-				// TODO(FelipeYepez) use LocalityLBPolicyMaglev once it does not require allow lisiting
-				return backends.LocalityLBPolicyDefault
-			}
+	if l4.enableWeightedLB && annotations.HasWeightedLBPodsPerNodeAnnotation(l4.Service) {
+		if l4.Service.Spec.ExternalTrafficPolicy == corev1.ServiceExternalTrafficPolicyTypeLocal {
+			// If the service has the annotation "networking.gke.io/weighted-load-balancing = pods-per-node"
+			// and the external traffic policy is local, weighted load balancing is enabled and the backend
+			// service locality policy is set to WEIGHTED_MAGLEV.
+			return backends.LocalityLBPolicyWeightedMaglev
+		} else {
+			// If the service has the annotation "networking.gke.io/weighted-load-balancing = pods-per-node"
+			// and the external traffic policy is cluster, weighted load balancing is not enabled.
+			l4.recorder.Eventf(l4.Service, corev1.EventTypeWarning, "UnsupportedConfiguration",
+				"Weighted load balancing by pods-per-node has no effect with External Traffic Policy: Cluster.")
+			// TODO(FelipeYepez) use LocalityLBPolicyMaglev once it does not require allow lisiting
+			return backends.LocalityLBPolicyDefault
 		}
 	}
 	// If the service has weighted load balancing disabled, the default locality policy is used.
