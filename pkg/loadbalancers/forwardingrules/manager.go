@@ -4,8 +4,9 @@ import (
 	cloudprovider "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
-	computega "google.golang.org/api/compute/v1"
+	"google.golang.org/api/compute/v1"
 
+	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-gcp/providers/gce"
 )
 
@@ -25,13 +26,15 @@ type L4ForwardingManager struct {
 	gceCloud *gce.Cloud
 	namer L4ResourcesNamer
 	cfg L4ForwardingManagerConfig
+
+	recorder record.EventRecorder
 }
 
 func (l4fm *L4ForwardingManager) Ensure() error {
 	return nil
 }
 
-func (l4fm *L4ForwardingManager) GetCurrentIPv4ForwardingRules() ([]*computega.ForwardingRule, error) {
+func (l4fm *L4ForwardingManager) GetCurrentIPv4ForwardingRules() ([]*compute.ForwardingRule, error) {
 	ctx, cancel := cloudprovider.ContextWithCallTimeout()
 	defer cancel()
 	// Might need to be filled

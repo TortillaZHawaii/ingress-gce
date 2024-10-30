@@ -61,7 +61,7 @@ func newPortset(ports []utils.ServicePort) *portset {
 
 func (p *portset) existingPorts() []utils.ServicePort {
 	var result []utils.ServicePort
-	for sp, _ := range p.existing {
+	for sp := range p.existing {
 		result = append(result, sp)
 	}
 	return result

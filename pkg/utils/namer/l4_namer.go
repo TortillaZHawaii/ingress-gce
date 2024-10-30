@@ -128,8 +128,15 @@ func (namer *L4Namer) L4ForwardingRulesRegex(namespace, name string) string {
 	// * L3_DEFAULT
 	// While we currently don't use L3_DEFAULT it's a longer string compared to TCP/UDP which have len() equal to 3.
 	// This means our REGEX has to account for that, as trimmedNamespacedName could be different for TCP/UDP and L3_DEFAULT,
-	protocols := []string{"tcp", "udp", "l3_default"}
+	protocols := []string{"tcp", "udp"}
 	
+	var frNames []string
+	for _, protocol := range protocols {
+		name := namer.L4ForwardingRule(namespace, name, protocol)
+		frNames = append(frNames, name)
+	}
+
+	return strings.Join(frNames, "|")
 }
 
 // L4HealthCheck returns the name of the L4 LB Healthcheck

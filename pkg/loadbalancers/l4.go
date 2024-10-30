@@ -34,6 +34,7 @@ import (
 	"k8s.io/ingress-gce/pkg/firewalls"
 	"k8s.io/ingress-gce/pkg/forwardingrules"
 	"k8s.io/ingress-gce/pkg/healthchecksl4"
+	"k8s.io/ingress-gce/pkg/loadbalancers/address"
 	"k8s.io/ingress-gce/pkg/metrics"
 	"k8s.io/ingress-gce/pkg/network"
 	"k8s.io/ingress-gce/pkg/utils"
@@ -64,7 +65,7 @@ type L4 struct {
 	Service                          *corev1.Service
 	ServicePort                      utils.ServicePort
 	NamespacedName                   types.NamespacedName
-	// forwardingRules                  ForwardingRulesProvider
+	forwardingRules                  ForwardingRulesProvider
 	healthChecks                     healthchecksl4.L4HealthChecks
 	enableDualStack                  bool
 	network                          network.NetworkInfo
@@ -281,7 +282,7 @@ func (l4 *L4) deleteIPv4Address() error {
 		l4.svcLogger.Info("Finished deleting IPv4 address for L4 ILB Service", "addressName", addressName, "timeTaken", time.Since(start))
 	}()
 
-	return ensureAddressDeleted(l4.cloud, addressName, l4.cloud.Region())
+	return address.EnsureAddressDeleted(l4.cloud, addressName, l4.cloud.Region())
 }
 
 func (l4 *L4) deleteIPv4NodesFirewall() error {
@@ -393,11 +394,11 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 	}
 
 	// Reserve existing IP address before making any changes
-	var existingIPv4FR []composite.ForwardingRule
+	var existingIPv4FR []*composite.ForwardingRule
 	var ipv4AddressToUse string
 	if !l4.enableDualStack || utils.NeedsIPv4(l4.Service) {
-		existingIPv4FR, err = l4.getOldIPv4ForwardingRule(existingBS)
-		ipv4AddressToUse, err = ipv4AddrToUse(l4.cloud, l4.recorder, l4.Service, existingIPv4FR, subnetworkURL)
+		existingIPv4FR[0], err = l4.getOldIPv4ForwardingRule(existingBS)
+		ipv4AddressToUse, err = ipv4AddrToUse(l4.cloud, l4.recorder, l4.Service, existingIPv4FR[0], subnetworkURL)
 		if err != nil {
 			result.Error = fmt.Errorf("EnsureInternalLoadBalancer error: ipv4AddrToUse returned error: %w", err)
 			return result
@@ -409,7 +410,7 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 
 			nm := types.NamespacedName{Namespace: l4.Service.Namespace, Name: l4.Service.Name}.String()
 			// ILB can be created only in Premium Tier
-			addrMgr := newAddressManager(l4.cloud, nm, l4.cloud.Region(), subnetworkURL, expectedFRName, ipv4AddressToUse, cloud.SchemeInternal, cloud.NetworkTierPremium, IPv4Version, l4.svcLogger)
+			addrMgr := address.NewManager(l4.cloud, nm, l4.cloud.Region(), subnetworkURL, expectedFRName, ipv4AddressToUse, cloud.SchemeInternal, cloud.NetworkTierPremium, address.IPv4Version, l4.svcLogger)
 			ipv4AddressToUse, _, err = addrMgr.HoldAddress()
 			if err != nil {
 				result.Error = fmt.Errorf("EnsureInternalLoadBalancer error: addrMgr.HoldAddress() returned error %w", err)
@@ -442,7 +443,7 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 		if !l4.cloud.IsLegacyNetwork() {
 			nm := types.NamespacedName{Namespace: l4.Service.Namespace, Name: l4.Service.Name}.String()
 			// ILB can be created only in Premium Tier
-			ipv6AddrMgr := newAddressManager(l4.cloud, nm, l4.cloud.Region(), subnetworkURL, expectedIPv6FRName, ipv6AddrToUse, cloud.SchemeInternal, cloud.NetworkTierPremium, IPv6Version, l4.svcLogger)
+			ipv6AddrMgr := address.NewManager(l4.cloud, nm, l4.cloud.Region(), subnetworkURL, expectedIPv6FRName, ipv6AddrToUse, cloud.SchemeInternal, cloud.NetworkTierPremium, address.IPv6Version, l4.svcLogger)
 			ipv6AddrToUse, _, err = ipv6AddrMgr.HoldAddress()
 			if err != nil {
 				result.Error = fmt.Errorf("EnsureInternalLoadBalancer error: ipv6AddrMgr.HoldAddress() returned error %w", err)
@@ -470,9 +471,9 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 		l4.svcLogger.Info("Protocol changed for service", "existingProtocol", existingBS.Protocol, "newProtocol", string(protocol))
 		if existingIPv4FR != nil {
 			// Delete ipv4 forwarding rule if it exists
-			err = l4.forwardingRules.Delete(existingIPv4FR.Name)
+			err = l4.forwardingRules.Delete(existingIPv4FR[0].Name)
 			if err != nil {
-				l4.svcLogger.Error(err, "Failed to delete forwarding rule", "forwardingRuleName", existingIPv4FR.Name)
+				l4.svcLogger.Error(err, "Failed to delete forwarding rule", "forwardingRuleName", existingIPv4FR[0].Name)
 			}
 		}
 
@@ -515,9 +516,9 @@ func (l4 *L4) EnsureInternalLoadBalancer(nodeNames []string, svc *corev1.Service
 	result.Annotations[annotations.BackendServiceKey] = bsName
 
 	if l4.enableDualStack {
-		l4.ensureDualStackResources(result, nodeNames, options, bs, existingIPv4FR, existingIPv6FR, subnetworkURL, ipv4AddressToUse, ipv6AddrToUse)
+		l4.ensureDualStackResources(result, nodeNames, options, bs, existingIPv4FR[0], existingIPv6FR, subnetworkURL, ipv4AddressToUse, ipv6AddrToUse)
 	} else {
-		l4.ensureIPv4Resources(result, nodeNames, options, bs, existingIPv4FR, subnetworkURL, ipv4AddressToUse)
+		l4.ensureIPv4Resources(result, nodeNames, options, bs, existingIPv4FR[0], subnetworkURL, ipv4AddressToUse)
 	}
 	if result.Error != nil {
 		return result
