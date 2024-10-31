@@ -315,7 +315,7 @@ func (l4 *L4) deleteFirewall(name string, fwLogger klog.Logger) error {
 // This appends the protocol to the forwarding rule name, which will help supporting multiple protocols in the same ILB
 // service.
 func (l4 *L4) GetFRName() string {
-	protocol := utils.GetProtocol(l4.Service.Spec.Ports)
+	protocol := utils.GetForwardingRuleProtocol(l4.Service.Spec.Ports)
 	return l4.getFRNameWithProtocol(string(protocol))
 }
 

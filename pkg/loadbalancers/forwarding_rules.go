@@ -169,7 +169,6 @@ func (l7 *L7) checkForwardingRule(protocol namer.NamerProtocol, name, proxyLink,
 // forwarding rules, a boolean indicating if this is an IP the controller
 // should manage or not and an error if the specified IP was not found.
 func (l7 *L7) getEffectiveIP() (string, bool, error) {
-
 	// A note on IP management:
 	// User specifies a different IP on startup:
 	//	- We create a forwarding rule with the given IP.
@@ -226,7 +225,7 @@ func (l4 *L4) ensureIPv4ForwardingRule(bsLink string, options gce.ILBOptions, ex
 
 	servicePorts := l4.Service.Spec.Ports
 	ports := utils.GetPorts(servicePorts)
-	protocol := utils.GetProtocol(servicePorts)
+	protocol := utils.GetForwardingRuleProtocol(servicePorts)
 	// Create the forwarding rule
 	frDesc, err := utils.MakeL4LBServiceDescription(utils.ServiceKeyFunc(l4.Service.Namespace, l4.Service.Name), ipToUse,
 		version, false, utils.ILB)
