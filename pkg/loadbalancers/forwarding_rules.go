@@ -225,7 +225,12 @@ func (l4 *L4) ensureIPv4ForwardingRule(bsLink string, options gce.ILBOptions, ex
 
 	servicePorts := l4.Service.Spec.Ports
 	ports := utils.GetPorts(servicePorts)
+	allPorts := false
 	protocol := utils.GetForwardingRuleProtocol(servicePorts)
+	if protocol == "L3_DEFAULT" {
+		allPorts = true
+		ports = nil
+	}
 	// Create the forwarding rule
 	frDesc, err := utils.MakeL4LBServiceDescription(utils.ServiceKeyFunc(l4.Service.Namespace, l4.Service.Name), ipToUse,
 		version, false, utils.ILB)
@@ -238,6 +243,7 @@ func (l4 *L4) ensureIPv4ForwardingRule(bsLink string, options gce.ILBOptions, ex
 		Name:                frName,
 		IPAddress:           ipToUse,
 		Ports:               ports,
+		AllPorts:            allPorts,
 		IPProtocol:          string(protocol),
 		LoadBalancingScheme: string(cloud.SchemeInternal),
 		Subnetwork:          subnetworkURL,
