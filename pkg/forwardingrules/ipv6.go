@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package loadbalancers
+package forwardingrules
 
 import (
 	"fmt"
@@ -40,7 +40,9 @@ const (
 	prefix96range = "/96"
 )
 
-func (l4 *L4) ensureIPv6ForwardingRule(bsLink string, options gce.ILBOptions, existingIPv6FwdRule *composite.ForwardingRule, ipv6AddressToUse string) (*composite.ForwardingRule, utils.ResourceSyncStatus, error) {
+type L4IPv6Manager struct{}
+
+func (l4 *L4IPv6Manager) ensureIPv6ForwardingRule(bsLink string, options gce.ILBOptions, existingIPv6FwdRule *composite.ForwardingRule, ipv6AddressToUse string) (*composite.ForwardingRule, utils.ResourceSyncStatus, error) {
 	start := time.Now()
 
 	expectedIPv6FwdRule, err := l4.buildExpectedIPv6ForwardingRule(bsLink, options, ipv6AddressToUse)
@@ -79,7 +81,7 @@ func (l4 *L4) ensureIPv6ForwardingRule(bsLink string, options gce.ILBOptions, ex
 	return createdFr, utils.ResourceUpdate, err
 }
 
-func (l4 *L4) buildExpectedIPv6ForwardingRule(bsLink string, options gce.ILBOptions, ipv6AddressToUse string) (*composite.ForwardingRule, error) {
+func (l4 *L4IPv6Manager) buildExpectedIPv6ForwardingRule(bsLink string, options gce.ILBOptions, ipv6AddressToUse string) (*composite.ForwardingRule, error) {
 	frName := l4.getIPv6FRName()
 
 	frDesc, err := utils.MakeL4IPv6ForwardingRuleDescription(l4.Service)
@@ -122,7 +124,7 @@ func (l4 *L4) buildExpectedIPv6ForwardingRule(bsLink string, options gce.ILBOpti
 	return fr, nil
 }
 
-func (l4 *L4) deleteChangedIPv6ForwardingRule(existingFwdRule *composite.ForwardingRule, expectedFwdRule *composite.ForwardingRule) error {
+func (l4 *L4IPv6Manager) deleteChangedIPv6ForwardingRule(existingFwdRule *composite.ForwardingRule, expectedFwdRule *composite.ForwardingRule) error {
 	frDiff := cmp.Diff(existingFwdRule, expectedFwdRule, cmpopts.IgnoreFields(composite.ForwardingRule{}, "IPAddress"))
 	l4.svcLogger.V(2).Info("IPv6 forwarding rule changed. Deleting existing ipv6 forwarding rule.",
 		"existingForwardingRule", fmt.Sprintf("%+v", existingFwdRule), "newForwardingRule", fmt.Sprintf("%+v", expectedFwdRule), "diff", frDiff)
@@ -296,25 +298,6 @@ func (l4netlb *L4NetLB) deleteChangedIPv6ForwardingRule(existingFwdRule *composi
 	}
 	l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeNormal, events.SyncIngress, "External ForwardingRule %q deleted", existingFwdRule.Name)
 	return nil
-}
-
-func EqualIPv6ForwardingRules(fr1, fr2 *composite.ForwardingRule) (bool, error) {
-	id1, err := cloud.ParseResourceURL(fr1.BackendService)
-	if err != nil {
-		return false, fmt.Errorf("EqualIPv6ForwardingRules(): failed to parse backend resource URL from FR, err - %w", err)
-	}
-	id2, err := cloud.ParseResourceURL(fr2.BackendService)
-	if err != nil {
-		return false, fmt.Errorf("EqualIPv6ForwardingRules(): failed to parse resource URL from FR, err - %w", err)
-	}
-	return fr1.IPProtocol == fr2.IPProtocol &&
-		fr1.LoadBalancingScheme == fr2.LoadBalancingScheme &&
-		equalPorts(fr1.Ports, fr2.Ports, fr1.PortRange, fr2.PortRange) &&
-		utils.EqualCloudResourceIDs(id1, id2) &&
-		fr1.AllowGlobalAccess == fr2.AllowGlobalAccess &&
-		fr1.AllPorts == fr2.AllPorts &&
-		fr1.Subnetwork == fr2.Subnetwork &&
-		fr1.NetworkTier == fr2.NetworkTier, nil
 }
 
 // ipv6AddrToUse determines which IPv4 address needs to be used in the ForwardingRule,

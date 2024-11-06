@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package loadbalancers
+package forwardingrules
 
 import (
 	"strings"
@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider-gcp/providers/gce"
 	"k8s.io/ingress-gce/pkg/composite"
-	"k8s.io/ingress-gce/pkg/forwardingrules"
 	"k8s.io/ingress-gce/pkg/network"
 	"k8s.io/ingress-gce/pkg/utils"
 	"k8s.io/ingress-gce/pkg/utils/namer"
@@ -324,7 +323,7 @@ func TestL4EnsureIPv6ForwardingRuleUpdate(t *testing.T) {
 			fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
 			l4 := &L4{
 				cloud:           fakeGCE,
-				forwardingRules: forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO()),
+				forwardingRules: New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO()),
 				namer:           l4namer,
 				Service:         tc.svc,
 				network: network.NetworkInfo{
@@ -372,5 +371,4 @@ func ipV6ForwardingRuleDescription(t *testing.T, namespace, name string) string 
 		t.Errorf("failed to create forwarding rule description for service %s/%s", namespace, name)
 	}
 	return description
-
 }
