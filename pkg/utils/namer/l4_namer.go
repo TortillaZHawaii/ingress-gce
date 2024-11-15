@@ -107,6 +107,12 @@ func (namer *L4Namer) L4IPv6Firewall(namespace, name string) string {
 //
 // Output name is at most 63 characters.
 func (namer *L4Namer) L4ForwardingRule(namespace, name, protocol string) string {
+	protocol = strings.ToLower(protocol)
+	// We can't use dashes in names.
+	if protocol == "l3_default" {
+		protocol = "l3"
+	}
+
 	// add 1 for hyphen
 	protoLen := len(protocol) + 1
 	return strings.Join([]string{

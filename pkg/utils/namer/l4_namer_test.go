@@ -111,6 +111,23 @@ func TestL4Namer(t *testing.T) {
 			expectIPv6HcFName:       "k8s2-7kpbhpki-namespace-name-956p2p7x-fw-ipv6",
 			expectHcName:            "k8s2-7kpbhpki-namespace-name-956p2p7x",
 		},
+		{
+			desc:                    "mixed protocol",
+			namespace:               "namespace",
+			name:                    "name",
+			subnetName:              longstring1,
+			proto:                   "L3_DEFAULT",
+			sharedHC:                false,
+			expectFRName:            "k8s2-l3-7kpbhpki-namespace-name-956p2p7x",
+			expectIPv6FRName:        "k8s2-l3-7kpbhpki-namespace-name-956p2p7x-ipv6",
+			expectNEGName:           "k8s2-7kpbhpki-namespace-name-956p2p7x",
+			expectNonDefaultNEGName: "k8s2-7kpbhpki-namespace-name-1fd834-956p2p7x",
+			expectFWName:            "k8s2-7kpbhpki-namespace-name-956p2p7x",
+			expectIPv6FWName:        "k8s2-7kpbhpki-namespace-name-956p2p7x-ipv6",
+			expectHcFwName:          "k8s2-7kpbhpki-namespace-name-956p2p7x-fw",
+			expectIPv6HcFName:       "k8s2-7kpbhpki-namespace-name-956p2p7x-fw-ipv6",
+			expectHcName:            "k8s2-7kpbhpki-namespace-name-956p2p7x",
+		},
 	}
 
 	newNamer := NewL4Namer(kubeSystemUID, nil)
