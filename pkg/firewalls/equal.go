@@ -31,7 +31,7 @@ func Equal(a, b *compute.Firewall, skipDescription bool) (bool, error) {
 	case !skipDescription && a.Description != b.Description:
 		return false, nil
 	default:
-		return equalAllowRules(a.Allowed, b.Allowed)
+		return EqualAllowRules(a.Allowed, b.Allowed)
 	}
 }
 
@@ -40,7 +40,7 @@ func Equal(a, b *compute.Firewall, skipDescription bool) (bool, error) {
 // Arrays are equal when they expose the same set of ports for each protocol.
 //
 // Returns error when there is a port definition that isn't an int or range (int-int)
-func equalAllowRules(a, b []*compute.FirewallAllowed) (bool, error) {
+func EqualAllowRules(a, b []*compute.FirewallAllowed) (bool, error) {
 	am, err := portsAllowedPerProtocol(a)
 	if err != nil {
 		return false, err
