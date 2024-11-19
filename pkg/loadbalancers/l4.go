@@ -71,6 +71,7 @@ type L4 struct {
 	networkResolver                  network.Resolver
 	enableWeightedLB                 bool
 	disableNodesFirewallProvisioning bool
+	enableMixedProtocol              bool
 	svcLogger                        klog.Logger
 }
 
@@ -109,6 +110,7 @@ type L4ILBParams struct {
 	NetworkResolver                  network.Resolver
 	EnableWeightedLB                 bool
 	DisableNodesFirewallProvisioning bool
+	EnableMixedProtocol              bool
 }
 
 // NewL4Handler creates a new L4Handler for the given L4 service.
@@ -635,6 +637,15 @@ func (l4 *L4) ensureIPv4NodesFirewall(nodeNames []string, ipAddress string, resu
 	servicePorts := l4.Service.Spec.Ports
 	protocol := utils.GetProtocol(servicePorts)
 	portRanges := utils.GetServicePortRanges(servicePorts)
+	allowed := []*compute.FirewallAllowed{
+		{
+			IPProtocol: string(protocol),
+			Ports:      portRanges,
+		},
+	}
+	if l4.enableMixedProtocol {
+		allowed = firewalls.AllowedForService(servicePorts)
+	}
 
 	fwLogger := l4.svcLogger.WithValues("firewallName", firewallName)
 	fwLogger.V(2).Info("Ensuring IPv4 nodes firewall for L4 ILB Service", "ipAddress", ipAddress, "protocol", protocol, "len(nodeNames)", len(nodeNames), "portRanges", portRanges)
@@ -650,12 +661,7 @@ func (l4 *L4) ensureIPv4NodesFirewall(nodeNames []string, ipAddress string, resu
 	}
 	// Add firewall rule for ILB traffic to nodes
 	nodesFWRParams := firewalls.FirewallParams{
-		Allowed: []*compute.FirewallAllowed{
-			{
-				IPProtocol: string(protocol),
-				Ports:      portRanges,
-			},
-		},
+		Allowed:           allowed,
 		SourceRanges:      ipv4SourceRanges,
 		DestinationRanges: []string{ipAddress},
 		Name:              firewallName,
