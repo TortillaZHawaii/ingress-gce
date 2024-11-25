@@ -69,6 +69,14 @@ func (frc *ForwardingRules) Delete(name string) error {
 	return nil
 }
 
+func (frc *ForwardingRules) deleteWithNotFound(name string) error {
+	key, err := frc.createKey(name)
+	if err != nil {
+		return fmt.Errorf("Failed to create key for deleting forwarding rule %s, err: %w", name, err)
+	}
+	return composite.DeleteForwardingRule(frc.cloud, key, frc.version, frc.logger)
+}
+
 func (frc *ForwardingRules) createKey(name string) (*meta.Key, error) {
 	return composite.CreateKey(frc.cloud, name, frc.scope)
 }

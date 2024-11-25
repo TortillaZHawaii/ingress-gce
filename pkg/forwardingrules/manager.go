@@ -3,6 +3,7 @@ package forwardingrules
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -74,13 +75,13 @@ func (m *ManagerELB) EnsureIPv4(cfg *EnsureELBConfig) (*EnsureELBResult, error) 
 	if needsTCP {
 		res.TCPFwdRule, tcpSync, tcpErr = m.ensure(cfg, m.name("TCP"), "TCP")
 	} else {
-		tcpErr = m.delete("TCP")
+		tcpSync, tcpErr = m.delete("TCP")
 	}
 
 	if needsUDP {
 		res.UDPFwdRule, udpSync, udpErr = m.ensure(cfg, m.name("UDP"), "UDP")
 	} else {
-		udpErr = m.delete("UDP")
+		udpSync, udpErr = m.delete("UDP")
 	}
 
 	res.SyncStatus = tcpSync || udpSync
@@ -211,8 +212,8 @@ func (m *ManagerELB) getAfterUpdate(name string) (*composite.ForwardingRule, uti
 }
 
 func (m *ManagerELB) DeleteIPv4() error {
-	tcpErr := m.delete("tcp")
-	udpErr := m.delete("udp")
+	_, tcpErr := m.delete("tcp")
+	_, udpErr := m.delete("udp")
 	legacyErr := m.deleteLegacy()
 
 	return errors.Join(tcpErr, udpErr, legacyErr)
@@ -224,10 +225,13 @@ func (m *ManagerELB) deleteLegacy() error {
 	return utils.IgnoreHTTPNotFound(err)
 }
 
-func (m *ManagerELB) delete(protocol string) error {
+func (m *ManagerELB) delete(protocol string) (utils.ResourceSyncStatus, error) {
 	name := m.name(protocol)
-	err := m.Provider.Delete(name)
-	return utils.IgnoreHTTPNotFound(err)
+	err := m.Provider.deleteWithNotFound(name)
+	if err != nil && utils.IsHTTPErrorCode(err, http.StatusNotFound) {
+		return utils.ResourceResync, nil
+	}
+	return utils.ResourceUpdate, err
 }
 
 func (m *ManagerELB) recreate(wanted *composite.ForwardingRule) error {

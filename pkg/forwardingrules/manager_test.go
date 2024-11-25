@@ -22,9 +22,9 @@ import (
 )
 
 const (
-	svcNamespace = "testNs"
-	svcName      = "testSvc"
-	bsLink       = "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1"
+	serviceNamespace = "testNs"
+	serviceName      = "testSvc"
+	bsLink           = "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1"
 )
 
 var (
@@ -55,9 +55,6 @@ func getTestMocks() (*gce.Cloud, *namer.L4Namer) {
 // }
 
 func TestEnsureIPv4Create(t *testing.T) {
-	serviceName := "testSvc"
-	serviceNamespace := "testNs"
-
 	testCases := []struct {
 		desc         string
 		svc          *corev1.Service
@@ -328,29 +325,425 @@ func TestEnsureIPv4Create(t *testing.T) {
 			if err != nil {
 				t.Errorf("EnsureIPv4() err=%v", err)
 			}
-
-			if tc.want.TCPFwdRule != nil {
-				if got.TCPFwdRule == nil {
-					t.Errorf("EnsureIPv4 didn't return expected TCP forwarding rule")
-				}
-				if diff := cmp.Diff(tc.want.TCPFwdRule, got.TCPFwdRule, cmpopts.IgnoreFields(composite.ForwardingRule{}, "SelfLink", "Region", "Scope")); diff != "" {
-					t.Errorf("EnsureIPv4() TCP forwarding rule diff -want +got\n%v\n", diff)
-				}
-			}
-
-			if tc.want.UDPFwdRule != nil {
-				if got.UDPFwdRule == nil {
-					t.Errorf("EnsureIPv4 didn't return expected UDP forwarding rule")
-				}
-				if diff := cmp.Diff(tc.want.UDPFwdRule, got.UDPFwdRule, cmpopts.IgnoreFields(composite.ForwardingRule{}, "SelfLink", "Region", "Scope")); diff != "" {
-					t.Errorf("EnsureIPv4() UDP forwarding rule diff -want +got\n%v\n", diff)
-				}
-			}
-
-			if got.IPManaged != tc.want.IPManaged {
-				t.Errorf("EnsureIPv4().IPManaged = %v, want %v", got.IPManaged, tc.want.IPManaged)
-			}
+			assertResult(t, got, tc.want)
 		})
+	}
+}
+
+func TestEnsureIPv4Update(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		svc      *corev1.Service
+		existing []*composite.ForwardingRule
+		want     *forwardingrules.EnsureELBResult
+	}{
+		{
+			desc: "no update, tcp only",
+			svc: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace, UID: types.UID("1")},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:     8080,
+							Protocol: corev1.ProtocolTCP,
+						},
+					},
+					Type: "LoadBalancer",
+				},
+			},
+			existing: []*composite.ForwardingRule{
+				{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+			want: &forwardingrules.EnsureELBResult{
+				SyncStatus: utils.ResourceResync,
+				TCPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+		},
+		{
+			desc: "no update, udp only",
+			svc: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace, UID: types.UID("1")},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:     1080,
+							Protocol: corev1.ProtocolUDP,
+						},
+						{
+							Port:     8080,
+							Protocol: corev1.ProtocolUDP,
+						},
+					},
+					Type: "LoadBalancer",
+				},
+			},
+			existing: []*composite.ForwardingRule{
+				{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"1080", "8080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+			want: &forwardingrules.EnsureELBResult{
+				SyncStatus: utils.ResourceResync,
+				UDPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"1080", "8080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+		},
+		{
+			desc: "no update, mixed",
+			svc: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace, UID: types.UID("1")},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:     8080,
+							Protocol: corev1.ProtocolTCP,
+						},
+						{
+							Port:     8080,
+							Protocol: corev1.ProtocolUDP,
+						},
+						{
+							Port:     443,
+							Protocol: corev1.ProtocolTCP,
+						},
+					},
+					Type: "LoadBalancer",
+				},
+			},
+			existing: []*composite.ForwardingRule{
+				{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080", "443"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+				{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+			want: &forwardingrules.EnsureELBResult{
+				SyncStatus: utils.ResourceResync,
+				TCPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080", "443"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+				UDPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+		},
+		{
+			desc: "update ports",
+			svc: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace, UID: types.UID("1")},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:     8080,
+							Protocol: corev1.ProtocolTCP,
+						},
+						{
+							Port:     443,
+							Protocol: corev1.ProtocolTCP,
+						},
+					},
+					Type: "LoadBalancer",
+				},
+			},
+			existing: []*composite.ForwardingRule{
+				{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+			want: &forwardingrules.EnsureELBResult{
+				SyncStatus: utils.ResourceUpdate,
+				TCPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080", "443"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+		},
+		{
+			desc: "change protocol",
+			svc: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace, UID: types.UID("1")},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:     1080,
+							Protocol: corev1.ProtocolUDP,
+						},
+						{
+							Port:     2080,
+							Protocol: corev1.ProtocolUDP,
+						},
+					},
+					Type: "LoadBalancer",
+				},
+			},
+			existing: []*composite.ForwardingRule{
+				{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+			want: &forwardingrules.EnsureELBResult{
+				SyncStatus: utils.ResourceUpdate,
+				UDPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"1080", "2080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+		},
+		{
+			desc: "mixed to udp only",
+			svc: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace, UID: types.UID("1")},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:     1080,
+							Protocol: corev1.ProtocolUDP,
+						},
+						{
+							Port:     2080,
+							Protocol: corev1.ProtocolUDP,
+						},
+					},
+					Type: "LoadBalancer",
+				},
+			},
+			existing: []*composite.ForwardingRule{
+				{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+				{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"1080", "2080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+			want: &forwardingrules.EnsureELBResult{
+				SyncStatus: utils.ResourceUpdate,
+				UDPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"1080", "2080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+		},
+		{
+			desc: "mixed to tcp only with port change",
+			svc: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace, UID: types.UID("1")},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:     1080,
+							Protocol: corev1.ProtocolTCP,
+						},
+						{
+							Port:     2080,
+							Protocol: corev1.ProtocolTCP,
+						},
+					},
+					Type: "LoadBalancer",
+				},
+			},
+			existing: []*composite.ForwardingRule{
+				{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"8080"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+				{
+					Name:                "k8s2-udp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"1080", "2080"},
+					IPProtocol:          "UDP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+			want: &forwardingrules.EnsureELBResult{
+				SyncStatus: utils.ResourceUpdate,
+				TCPFwdRule: &composite.ForwardingRule{
+					Name:                "k8s2-tcp-axyqjz2d-testNs-testSvc-2ve2wd1r",
+					Ports:               []string{"1080", "2080"},
+					IPProtocol:          "TCP",
+					LoadBalancingScheme: string(cloud.SchemeExternal),
+					NetworkTier:         cloud.NetworkTierDefault.ToGCEValue(),
+					Version:             meta.VersionGA,
+					BackendService:      bsLink,
+					Description:         l4ServiceDescription(t, serviceName, serviceNamespace, "", utils.XLB),
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// Arrange
+			fakeGCE, namer := getTestMocks()
+			fw := forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+			m := &forwardingrules.ManagerELB{
+				Namer:    namer,
+				Provider: fw,
+				Recorder: &record.FakeRecorder{},
+				Service:  tc.svc,
+			}
+
+			for _, rule := range tc.existing {
+				err := fw.Create(rule)
+				if err != nil {
+					t.Errorf("Failed to set up existing forwarding rule: %v", err)
+				}
+			}
+
+			// Act
+			got, err := m.EnsureIPv4(&forwardingrules.EnsureELBConfig{
+				BackendServiceLink: bsLink,
+			})
+			// Assert
+			if err != nil {
+				t.Errorf("EnsureIPv4() err=%v", err)
+			}
+			assertResult(t, got, tc.want)
+		})
+	}
+}
+
+func assertResult(t *testing.T, got, want *forwardingrules.EnsureELBResult) {
+	if want.SyncStatus != got.SyncStatus {
+		t.Errorf("EnsureIPv4().SyncStatus = %v, want %v", got.SyncStatus, want.SyncStatus)
+	}
+
+	if want.TCPFwdRule != nil {
+		if got.TCPFwdRule == nil {
+			t.Errorf("EnsureIPv4 didn't return expected TCP forwarding rule")
+		}
+		if diff := cmp.Diff(want.TCPFwdRule, got.TCPFwdRule, cmpopts.IgnoreFields(composite.ForwardingRule{}, "SelfLink", "Region", "Scope")); diff != "" {
+			t.Errorf("EnsureIPv4() TCP forwarding rule diff -want +got\n%v\n", diff)
+		}
+	}
+
+	if want.UDPFwdRule != nil {
+		if got.UDPFwdRule == nil {
+			t.Errorf("EnsureIPv4 didn't return expected UDP forwarding rule")
+		}
+		if diff := cmp.Diff(want.UDPFwdRule, got.UDPFwdRule, cmpopts.IgnoreFields(composite.ForwardingRule{}, "SelfLink", "Region", "Scope")); diff != "" {
+			t.Errorf("EnsureIPv4() UDP forwarding rule diff -want +got\n%v\n", diff)
+		}
+	}
+
+	if got.IPManaged != want.IPManaged {
+		t.Errorf("EnsureIPv4().IPManaged = %v, want %v", got.IPManaged, want.IPManaged)
 	}
 }
 
