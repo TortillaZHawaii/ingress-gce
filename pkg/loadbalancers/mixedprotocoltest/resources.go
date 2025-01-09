@@ -16,6 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// Name for fake GCE resource
 const (
 	ForwardingRuleTCPIPv4Name    = "k8s2-tcp-axyqjz2d-test-namespace-test-name-yuvhdy7i"
 	ForwardingRuleTCPIPv6Name    = "k8s2-tcp-axyqjz2d-test-namespace-test-name-yuvhdy7i-ipv6"

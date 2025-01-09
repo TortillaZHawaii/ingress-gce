@@ -1,4 +1,4 @@
-// Package mixedprotocolilbtests contains helpers specific for testing internal mixed protocol L4 load balancers
+// Package mixedprotocolilbtest contains helpers specific for testing internal mixed protocol L4 load balancers
 package mixedprotocolilbtest
 
 const (
