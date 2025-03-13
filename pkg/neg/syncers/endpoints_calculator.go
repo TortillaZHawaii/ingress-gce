@@ -174,7 +174,7 @@ func (l *ClusterL4EndpointsCalculator) Mode() types.EndpointsCalculatorMode {
 }
 
 // CalculateEndpoints determines the endpoints in the NEGs based on the current service endpoints and the current NEGs.
-func (l *ClusterL4EndpointsCalculator) CalculateEndpoints(_ []types.EndpointsData, currentMap map[negtypes.NEGLocation]types.NetworkEndpointSet) (map[negtypes.NEGLocation]types.NetworkEndpointSet, types.EndpointPodMap, int, error) {
+func (l *ClusterL4EndpointsCalculator) CalculateEndpoints(eds []types.EndpointsData, currentMap map[negtypes.NEGLocation]types.NetworkEndpointSet) (map[negtypes.NEGLocation]types.NetworkEndpointSet, types.EndpointPodMap, int, error) {
 	// In this mode, any of the cluster nodes can be part of the subset, whether or not a matching pod runs on it.
 	nodes, _ := l.zoneGetter.ListNodes(zonegetter.CandidateAndUnreadyNodesFilter, l.logger)
 	zoneNodeMap := make(map[string][]*nodeWithSubnet)
@@ -193,8 +193,19 @@ func (l *ClusterL4EndpointsCalculator) CalculateEndpoints(_ []types.EndpointsDat
 	}
 	l.logger.V(2).Info("Got zoneNodeMap as input for service", "zoneNodeMap", nodeMapToString(zoneNodeMap), "serviceID", l.svcId)
 	// Compute the networkEndpoints, with total endpoints <= l.subsetSizeLimit.
-	subsetMap, err := getSubsetPerZone(zoneNodeMap, l.subsetSizeLimit, l.svcId, currentMap, l.logger, l.networkInfo)
+	wantedEndpoints := linearEndpointsPerPods(len(zoneNodeMap), len(eds), l.subsetSizeLimit)
+	// Decreasing the number of Endpoints is compute intensive, so we want to avoid that.
+	lowerBound := max(wantedEndpoints, len(currentMap))
+	subsetMap, err := getSubsetPerZone(zoneNodeMap, lowerBound, l.svcId, currentMap, l.logger, l.networkInfo)
 	return subsetMap, nil, 0, err
+}
+
+func linearEndpointsPerPods(zonesCount, endpointsCount, subsetSizeLimit int) int {
+	const minCountPerZone = 3
+	mini := zonesCount * minCountPerZone
+	maxi := subsetSizeLimit
+
+	return max(min(endpointsCount, mini), maxi)
 }
 
 func (l *ClusterL4EndpointsCalculator) CalculateEndpointsDegradedMode(eps []types.EndpointsData, currentMap map[negtypes.NEGLocation]types.NetworkEndpointSet) (map[negtypes.NEGLocation]types.NetworkEndpointSet, types.EndpointPodMap, error) {
