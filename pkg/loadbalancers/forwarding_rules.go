@@ -473,12 +473,10 @@ func (l4netlb *L4NetLB) updateForwardingRule(existingFwdRule, newFr *composite.F
 	}
 	frLogger.Info("upl3: created l3")
 
-	// There is some delay before the Forwarding Rule picks up traffic
-	// So this is in place to hopefully ensure that L3 is ready
-	if _, err := l4netlb.forwardingRules.Get(l3Name); err != nil {
-		return err
-	}
-	frLogger.Info("upl3: got l3")
+	// This could be based on some SLA
+	time.Sleep(30 * time.Second)
+
+	frLogger.Info("upl3: deleting fr")
 
 	tOld := time.Now()
 	if err := l4netlb.forwardingRules.Delete(existingFwdRule.Name); err != nil {
@@ -487,6 +485,7 @@ func (l4netlb *L4NetLB) updateForwardingRule(existingFwdRule, newFr *composite.F
 	l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeNormal, events.SyncIngress, "ForwardingRule %s deleted", existingFwdRule.Name)
 	frLogger.Info("upl3: deleted fr")
 
+	frLogger.Info("upl3: recreating fr")
 	if err := l4netlb.createFwdRule(newFr, frLogger); err != nil {
 		return err
 	}
@@ -495,12 +494,10 @@ func (l4netlb *L4NetLB) updateForwardingRule(existingFwdRule, newFr *composite.F
 
 	deltaOld := time.Since(tOld)
 
-	// There is some delay before the Forwarding Rule picks up traffic
-	if _, err := l4netlb.forwardingRules.Get(newFr.Name); err != nil {
-		return err
-	}
-	frLogger.Info("upl3: got fr")
+	// This could be based on some SLA
+	time.Sleep(30 * time.Second)
 
+	frLogger.Info("upl3: deleting l3")
 	if err := l4netlb.forwardingRules.Delete(l3Name); err != nil {
 		return err
 	}
