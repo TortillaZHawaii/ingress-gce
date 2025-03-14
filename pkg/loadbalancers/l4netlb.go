@@ -343,12 +343,6 @@ func (l4netlb *L4NetLB) connectionTrackingPolicy() *composite.BackendServiceConn
 
 func (l4netlb *L4NetLB) provideBackendService(syncResult *L4NetLBSyncResult, hcLink string) string {
 	bsName := l4netlb.namer.L4Backend(l4netlb.Service.Namespace, l4netlb.Service.Name)
-	servicePorts := l4netlb.Service.Spec.Ports
-
-	protocol := string(utils.GetProtocol(servicePorts))
-	if l4netlb.enableMixedProtocol {
-		protocol = backends.GetProtocol(servicePorts)
-	}
 
 	localityLbPolicy := l4netlb.determineBackendServiceLocalityPolicy()
 
@@ -356,7 +350,7 @@ func (l4netlb *L4NetLB) provideBackendService(syncResult *L4NetLBSyncResult, hcL
 	backendParams := backends.L4BackendServiceParams{
 		Name:                     bsName,
 		HealthCheckLink:          hcLink,
-		Protocol:                 protocol,
+		Protocol:                 "UNSPECIFIED",
 		SessionAffinity:          string(l4netlb.Service.Spec.SessionAffinity),
 		Scheme:                   string(cloud.SchemeExternal),
 		NamespacedName:           l4netlb.NamespacedName,

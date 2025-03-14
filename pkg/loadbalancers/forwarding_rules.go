@@ -455,15 +455,65 @@ func (l4netlb *L4NetLB) ensureIPv4ForwardingRule(bsLink string) (*composite.Forw
 }
 
 func (l4netlb *L4NetLB) updateForwardingRule(existingFwdRule, newFr *composite.ForwardingRule, frLogger klog.Logger) error {
+	// Create temporary L3 rule for migration
+	tWithL3 := time.Now()
+	l3Name := newFr.Name + "tmp"
+	frLogger.Info("upl3: starting update")
+	if err := l4netlb.forwardingRules.Create(&composite.ForwardingRule{
+		Name:                l3Name,
+		Description:         newFr.Description,
+		IPAddress:           newFr.IPAddress,
+		IPProtocol:          "L3_DEFAULT",
+		AllPorts:            true,
+		LoadBalancingScheme: string(cloud.SchemeExternal),
+		BackendService:      newFr.BackendService,
+		NetworkTier:         newFr.NetworkTier,
+	}); err != nil {
+		return err
+	}
+	frLogger.Info("upl3: created l3")
+
+	// There is some delay before the Forwarding Rule picks up traffic
+	// So this is in place to hopefully ensure that L3 is ready
+	if _, err := l4netlb.forwardingRules.Get(l3Name); err != nil {
+		return err
+	}
+	frLogger.Info("upl3: got l3")
+
+	tOld := time.Now()
 	if err := l4netlb.forwardingRules.Delete(existingFwdRule.Name); err != nil {
 		return err
 	}
 	l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeNormal, events.SyncIngress, "ForwardingRule %s deleted", existingFwdRule.Name)
+	frLogger.Info("upl3: deleted fr")
 
 	if err := l4netlb.createFwdRule(newFr, frLogger); err != nil {
 		return err
 	}
 	l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeNormal, events.SyncIngress, "ForwardingRule %s re-created", newFr.Name)
+	frLogger.Info("upl3: created fr")
+
+	deltaOld := time.Since(tOld)
+
+	// There is some delay before the Forwarding Rule picks up traffic
+	if _, err := l4netlb.forwardingRules.Get(newFr.Name); err != nil {
+		return err
+	}
+	frLogger.Info("upl3: got fr")
+
+	if err := l4netlb.forwardingRules.Delete(l3Name); err != nil {
+		return err
+	}
+	frLogger.Info("upl3: deleted l3")
+
+	deltaWithL3 := time.Since(tWithL3)
+
+	l4netlb.svcLogger.V(0).Info("upl3: Recreated Forwarding rule with L3 Temporary rule",
+		"deltaOldMs", deltaOld.Milliseconds(),
+		"deltaWithL3Ms", deltaWithL3.Milliseconds(),
+		"started", tOld,
+	)
+
 	return nil
 }
 
