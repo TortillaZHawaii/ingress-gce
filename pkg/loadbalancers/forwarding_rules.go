@@ -455,6 +455,7 @@ func (l4netlb *L4NetLB) ensureIPv4ForwardingRule(bsLink string) (*composite.Forw
 }
 
 func (l4netlb *L4NetLB) updateForwardingRule(existingFwdRule, newFr *composite.ForwardingRule, frLogger klog.Logger) error {
+	// -- Step 3 --
 	// Create temporary L3 rule for migration
 	tWithL3 := time.Now()
 	l3Name := newFr.Name + "tmp"
@@ -473,11 +474,15 @@ func (l4netlb *L4NetLB) updateForwardingRule(existingFwdRule, newFr *composite.F
 	}
 	frLogger.Info("upl3: created l3")
 
-	// This could be based on some SLA
-	time.Sleep(30 * time.Second)
+	if tempFR, err := l4netlb.forwardingRules.Get(l3Name); err != nil {
+		return err
+	} else if tempFR != nil {
+		frLogger.Info("upl3: temp L3", "tempFR", tempFR, "labels", tempFR.Labels)
+	}
 
 	frLogger.Info("upl3: deleting fr")
 
+	// -- Step 4 --
 	tOld := time.Now()
 	if err := l4netlb.forwardingRules.Delete(existingFwdRule.Name); err != nil {
 		return err
@@ -485,18 +490,19 @@ func (l4netlb *L4NetLB) updateForwardingRule(existingFwdRule, newFr *composite.F
 	l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeNormal, events.SyncIngress, "ForwardingRule %s deleted", existingFwdRule.Name)
 	frLogger.Info("upl3: deleted fr")
 
-	frLogger.Info("upl3: recreating fr")
-	if err := l4netlb.createFwdRule(newFr, frLogger); err != nil {
-		return err
-	}
-	l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeNormal, events.SyncIngress, "ForwardingRule %s re-created", newFr.Name)
-	frLogger.Info("upl3: created fr")
+	// -- Step 5 --
+	// time.Sleep(1 * time.Minute)
+
+	// frLogger.Info("upl3: recreating fr")
+	// if err := l4netlb.createFwdRule(newFr, frLogger); err != nil {
+	// 	return err
+	// }
+	// l4netlb.recorder.Eventf(l4netlb.Service, corev1.EventTypeNormal, events.SyncIngress, "ForwardingRule %s re-created", newFr.Name)
+	// frLogger.Info("upl3: created fr")
 
 	deltaOld := time.Since(tOld)
 
-	// This could be based on some SLA
-	time.Sleep(30 * time.Second)
-
+	// -- Step 6 --
 	frLogger.Info("upl3: deleting l3")
 	if err := l4netlb.forwardingRules.Delete(l3Name); err != nil {
 		return err
