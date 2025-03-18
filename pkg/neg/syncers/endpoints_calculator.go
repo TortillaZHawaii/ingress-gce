@@ -192,12 +192,23 @@ func (l *ClusterL4EndpointsCalculator) CalculateEndpoints(eds []types.EndpointsD
 		zoneNodeMap[zone] = append(zoneNodeMap[zone], newNodeWithSubnet(node, subnet))
 	}
 	l.logger.V(2).Info("Got zoneNodeMap as input for service", "zoneNodeMap", nodeMapToString(zoneNodeMap), "serviceID", l.svcId)
-	// Compute the networkEndpoints, with total endpoints <= l.subsetSizeLimit.
-	wantedEndpoints := linearEndpointsPerPods(len(zoneNodeMap), len(eds), l.subsetSizeLimit)
-	// Decreasing the number of Endpoints is compute intensive, so we want to avoid that.
-	lowerBound := max(wantedEndpoints, len(currentMap))
-	subsetMap, err := getSubsetPerZone(zoneNodeMap, lowerBound, l.svcId, currentMap, l.logger, l.networkInfo)
+	wanted := l.wantedNEGsCount(eds, currentMap, len(zoneNodeMap))
+	subsetMap, err := getSubsetPerZone(zoneNodeMap, wanted, l.svcId, currentMap, l.logger, l.networkInfo)
 	return subsetMap, nil, 0, err
+}
+
+func (l *ClusterL4EndpointsCalculator) wantedNEGsCount(eds []types.EndpointsData, currentMap map[negtypes.NEGLocation]types.NetworkEndpointSet, zonesCount int) int {
+	// Compute the networkEndpoints, with total endpoints <= l.subsetSizeLimit.
+
+	optimal := linearEndpointsPerPods(zonesCount, edsLen(eds), l.subsetSizeLimit)
+
+	// Decreasing the number of Endpoints is compute intensive, so we want to avoid that.
+	used := negsLen(currentMap)
+	wanted := max(optimal, used)
+
+	l.logger.V(2).Info("Calculated wanted endpoints", "optimal", optimal, "used", used, "wanted", wanted)
+
+	return wanted
 }
 
 func linearEndpointsPerPods(zonesCount, endpointsCount, subsetSizeLimit int) int {
@@ -205,7 +216,23 @@ func linearEndpointsPerPods(zonesCount, endpointsCount, subsetSizeLimit int) int
 	mini := zonesCount * minCountPerZone
 	maxi := subsetSizeLimit
 
-	return max(min(endpointsCount, mini), maxi)
+	return min(max(endpointsCount, mini), maxi)
+}
+
+func negsLen(m map[negtypes.NEGLocation]types.NetworkEndpointSet) int {
+	total := 0
+	for _, v := range m {
+		total += v.Len()
+	}
+	return total
+}
+
+func edsLen(eds []types.EndpointsData) int {
+	total := 0
+	for _, ed := range eds {
+		total += len(ed.Addresses)
+	}
+	return total
 }
 
 func (l *ClusterL4EndpointsCalculator) CalculateEndpointsDegradedMode(eps []types.EndpointsData, currentMap map[negtypes.NEGLocation]types.NetworkEndpointSet) (map[negtypes.NEGLocation]types.NetworkEndpointSet, types.EndpointPodMap, error) {
