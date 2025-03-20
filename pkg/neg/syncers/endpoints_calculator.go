@@ -178,6 +178,7 @@ func (l *ClusterL4EndpointsCalculator) CalculateEndpoints(eds []types.EndpointsD
 	// In this mode, any of the cluster nodes can be part of the subset, whether or not a matching pod runs on it.
 	nodes, _ := l.zoneGetter.ListNodes(zonegetter.CandidateAndUnreadyNodesFilter, l.logger)
 	zoneNodeMap := make(map[string][]*nodeWithSubnet)
+	zoneSubnetPairs := make(map[string]any)
 	for _, node := range nodes {
 		if !l.networkInfo.IsNodeConnected(node) {
 			l.logger.Info("Node not connected to service network", "nodeName", node.Name, "network", l.networkInfo.K8sNetwork)
@@ -190,17 +191,18 @@ func (l *ClusterL4EndpointsCalculator) CalculateEndpoints(eds []types.EndpointsD
 			continue
 		}
 		zoneNodeMap[zone] = append(zoneNodeMap[zone], newNodeWithSubnet(node, subnet))
+		zoneSubnetPairs[zone+":"+subnet] = struct{}{}
 	}
 	l.logger.V(2).Info("Got zoneNodeMap as input for service", "zoneNodeMap", nodeMapToString(zoneNodeMap), "serviceID", l.svcId)
-	wanted := l.wantedNEGsCount(eds, currentMap, len(zoneNodeMap))
+	wanted := l.wantedNEGsCount(eds, currentMap, len(zoneSubnetPairs))
 	subsetMap, err := getSubsetPerZone(zoneNodeMap, wanted, l.svcId, currentMap, l.logger, l.networkInfo)
 	return subsetMap, nil, 0, err
 }
 
-func (l *ClusterL4EndpointsCalculator) wantedNEGsCount(eds []types.EndpointsData, currentMap map[negtypes.NEGLocation]types.NetworkEndpointSet, zonesCount int) int {
+// should zones count take into account subnets?
+func (l *ClusterL4EndpointsCalculator) wantedNEGsCount(eds []types.EndpointsData, currentMap map[negtypes.NEGLocation]types.NetworkEndpointSet, zoneSubnetPairCount int) int {
 	// Compute the networkEndpoints, with total endpoints <= l.subsetSizeLimit.
-
-	optimal := linearEndpointsPerPods(zonesCount, edsLen(eds), l.subsetSizeLimit)
+	optimal := linearEndpointsPerPods(zoneSubnetPairCount, edsLen(eds), l.subsetSizeLimit)
 
 	// Decreasing the number of Endpoints is compute intensive, so we want to avoid that.
 	used := negsLen(currentMap)
@@ -211,9 +213,9 @@ func (l *ClusterL4EndpointsCalculator) wantedNEGsCount(eds []types.EndpointsData
 	return wanted
 }
 
-func linearEndpointsPerPods(zonesCount, endpointsCount, subsetSizeLimit int) int {
-	const minCountPerZone = 3
-	mini := zonesCount * minCountPerZone
+func linearEndpointsPerPods(zoneSubnetPairCount, endpointsCount, subsetSizeLimit int) int {
+	const minCountPerZoneSubnetPair = 3
+	mini := zoneSubnetPairCount * minCountPerZoneSubnetPair
 	maxi := subsetSizeLimit
 
 	return min(max(endpointsCount, mini), maxi)

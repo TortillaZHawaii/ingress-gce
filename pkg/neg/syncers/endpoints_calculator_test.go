@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/ingress-gce/pkg/flags"
 	"k8s.io/ingress-gce/pkg/neg/metrics/metricscollector"
+	"k8s.io/ingress-gce/pkg/neg/types"
 	negtypes "k8s.io/ingress-gce/pkg/neg/types"
 	"k8s.io/ingress-gce/pkg/network"
 	"k8s.io/ingress-gce/pkg/utils"
@@ -347,6 +348,25 @@ func TestClusterGetEndpointSet(t *testing.T) {
 			if !reflect.DeepEqual(degradedSet, tc.wantEndpointSets) {
 				t.Errorf("For degraded mode case %q, expecting endpoint set %v, but got %v.", tc.desc, tc.wantEndpointSets, retSet)
 			}
+		})
+	}
+}
+
+func TestClusterWantedNEGsCount(t *testing.T) {
+	testCases := []struct {
+		desc       string
+		endpoints  []types.EndpointsData
+		currentMap map[negtypes.NEGLocation]negtypes.NetworkEndpointSet
+		zonesCount int
+		want       int
+	}{
+		{
+			desc: "",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+
 		})
 	}
 }
