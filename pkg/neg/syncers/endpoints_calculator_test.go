@@ -350,7 +350,7 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 	// we care only about total numbers in this test
 	testCases := []struct {
 		desc             string
-		external         bool
+		internal         bool
 		podsCount        int
 		currentNEGsCount map[negtypes.NEGLocation]int
 		nodesCount       map[negtypes.NEGLocation]int
@@ -475,7 +475,6 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:             "3 zone, 10k pods, 30k nodes, NetLB",
-			external:         true,
 			podsCount:        10_000,
 			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
@@ -483,15 +482,16 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 10_000,
 				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 10_000,
 			},
-			// TODO: fill with actual values
+			// We split 250 between 3 zones
 			wantCount: map[negtypes.NEGLocation]int{
-				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 255,
-				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 255,
-				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 255,
+				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 83,
+				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 83,
+				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 84,
 			},
 		},
 		{
 			desc:             "3 zone, 10k pods, 30k nodes, ILB",
+			internal:         true,
 			podsCount:        10_000,
 			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
@@ -499,11 +499,29 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 10_000,
 				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 10_000,
 			},
-			// TODO: fill with actual values
+			// We split 25 between 3 zones
 			wantCount: map[negtypes.NEGLocation]int{
-				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 255,
-				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 255,
-				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 255,
+				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 8,
+				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 8,
+				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 9,
+			},
+		},
+		{
+			desc:             "3 zone, 10k pods, 30k+1 nodes, ILB",
+			internal:         true,
+			podsCount:        10_000,
+			currentNEGsCount: map[negtypes.NEGLocation]int{},
+			nodesCount: map[negtypes.NEGLocation]int{
+				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 10_000,
+				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 10_001,
+				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 10_000,
+			},
+			// We split 25 between 3 zones
+			wantCount: map[negtypes.NEGLocation]int{
+				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 8,
+				// this zone should get one more, since it has the most nodes
+				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 9,
+				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 8,
 			},
 		},
 	}
@@ -526,22 +544,30 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 			defer func() { flags.F.EnableMultiSubnetCluster = prevFlag }()
 			flags.F.EnableMultiSubnetCluster = false
 
-			lbType := negtypes.L4InternalLB
-			if tC.external {
-				lbType = negtypes.L4ExternalLB
+			lbType := negtypes.L4ExternalLB
+			if tC.internal {
+				lbType = negtypes.L4InternalLB
 			}
 			currentMap := make(map[negtypes.NEGLocation]negtypes.NetworkEndpointSet)
 			for loc, count := range tC.currentNEGsCount {
-				currentMap[loc] = negtypes.NewNetworkEndpointSet(make([]negtypes.NetworkEndpoint, count)...)
+				set := negtypes.NewNetworkEndpointSet()
+				for i := range count {
+					// This will overflow the IP, but for this test this doesn't matter
+					set.Insert(negtypes.NetworkEndpoint{IP: fmt.Sprintf("1.2.3.%d", i)})
+				}
+				currentMap[loc] = set
 			}
 
 			eds := make([]negtypes.EndpointsData, tC.podsCount)
-			for i := 0; i < tC.podsCount; i++ {
+			for i := range tC.podsCount {
 				eds[i] = negtypes.EndpointsData{
 					Addresses: []negtypes.AddressData{
 						{
 							Ready:    true,
 							NodeName: ptr.To("this-is-duplicated-but-thats-okay"),
+							TargetRef: &v1.ObjectReference{
+								Namespace: testServiceNamespace,
+							},
 						},
 					},
 				}

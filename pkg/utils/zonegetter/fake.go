@@ -97,15 +97,16 @@ func AddFakeNodes(zoneGetter *ZoneGetter, newZone string, instances ...string) e
 
 func AddFakeNodesCount(zoneGetter *ZoneGetter, nodeInformer cache.SharedIndexInformer, zone, subnet string, count int) error {
 	for i := 0; i < count; i++ {
+		name := fmt.Sprintf("instance-%s-%s-%d", zone, subnet, i)
 		node := &apiv1.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("instance-%s-%s-%d", zone, subnet, i),
+				Name: name,
 				Labels: map[string]string{
 					utils.LabelNodeSubnet: subnet,
 				},
 			},
 			Spec: apiv1.NodeSpec{
-				ProviderID: fmt.Sprintf("gce://foo-project/%s/instance1", zone),
+				ProviderID: fmt.Sprintf("gce://foo-project/%s/%s", zone, name),
 				// This IPs won't make sense in a real world cluster but that's okay for this test.
 				PodCIDR:  fmt.Sprintf("10.100.%d.0/24", i),
 				PodCIDRs: []string{fmt.Sprintf("10.100.%d.0/24", i)},
