@@ -31,12 +31,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/ingress-gce/pkg/flags"
 	"k8s.io/ingress-gce/pkg/neg/metrics/metricscollector"
-	"k8s.io/ingress-gce/pkg/neg/types"
 	negtypes "k8s.io/ingress-gce/pkg/neg/types"
 	"k8s.io/ingress-gce/pkg/network"
 	"k8s.io/ingress-gce/pkg/utils"
 	"k8s.io/ingress-gce/pkg/utils/zonegetter"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 // TestLocalGetEndpointSet verifies the GetEndpointSet method implemented by the LocalL4EndpointsCalculator.
@@ -351,14 +351,14 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 	testCases := []struct {
 		desc             string
 		external         bool
-		endpoints        []types.EndpointsData
+		podsCount        int
 		currentNEGsCount map[negtypes.NEGLocation]int
 		nodesCount       map[negtypes.NEGLocation]int
 		wantCount        map[negtypes.NEGLocation]int
 	}{
 		{
 			desc:             "1 zone, 1 pod",
-			endpoints:        []types.EndpointsData{{}}, // 1
+			podsCount:        1,
 			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 3,
@@ -369,7 +369,7 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:             "4 zones, 1 pod",
-			endpoints:        []types.EndpointsData{{}}, // 1
+			podsCount:        1,
 			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 3,
@@ -386,7 +386,7 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:             "2 zones, 2 subnets, 1 pod",
-			endpoints:        []types.EndpointsData{{}}, // 1
+			podsCount:        1,
 			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}:    3,
@@ -403,7 +403,8 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:             "1 zone, 50 pods, 100 nodes",
-			currentNEGsCount: map[negtypes.NEGLocation]int{}, // 50
+			podsCount:        50,
+			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 100,
 			},
@@ -413,7 +414,8 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:             "1 zone, 100 pods, 100 nodes",
-			currentNEGsCount: map[negtypes.NEGLocation]int{}, // 100
+			podsCount:        100,
+			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 100,
 			},
@@ -423,7 +425,8 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:             "1 zone, 150 pods, 100 nodes",
-			currentNEGsCount: map[negtypes.NEGLocation]int{}, // 150
+			podsCount:        150,
+			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 100,
 			},
@@ -433,7 +436,7 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:      "1 zone, 100 -> 10 pods, 100 nodes, keep NEGs",
-			endpoints: []types.EndpointsData{{}}, // 10
+			podsCount: 10,
 			currentNEGsCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 100,
 			},
@@ -446,7 +449,7 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:      "1 zone, 10 -> 10 pods, 100 nodes, keep NEGs",
-			endpoints: []types.EndpointsData{{}}, // 100
+			podsCount: 10,
 			currentNEGsCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 10,
 			},
@@ -459,7 +462,7 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		},
 		{
 			desc:      "1 zone, 10 -> 100 pods, 100 nodes, increase NEGs",
-			endpoints: []types.EndpointsData{{}}, // 100
+			podsCount: 100,
 			currentNEGsCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 10,
 			},
@@ -473,32 +476,34 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		{
 			desc:             "3 zone, 10k pods, 30k nodes, NetLB",
 			external:         true,
-			endpoints:        []types.EndpointsData{{}}, // 10k
+			podsCount:        10_000,
 			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 10_000,
 				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 10_000,
 				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 10_000,
 			},
+			// TODO: fill with actual values
 			wantCount: map[negtypes.NEGLocation]int{
-				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 3,
-				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 3,
-				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 3,
+				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 255,
+				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 255,
+				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 255,
 			},
 		},
 		{
 			desc:             "3 zone, 10k pods, 30k nodes, ILB",
-			endpoints:        []types.EndpointsData{{}}, // 10k
+			podsCount:        10_000,
 			currentNEGsCount: map[negtypes.NEGLocation]int{},
 			nodesCount: map[negtypes.NEGLocation]int{
 				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 10_000,
 				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 10_000,
 				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 10_000,
 			},
+			// TODO: fill with actual values
 			wantCount: map[negtypes.NEGLocation]int{
-				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 3,
-				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 3,
-				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 3,
+				{Zone: negtypes.TestZone1, Subnet: defaultTestSubnet}: 255,
+				{Zone: negtypes.TestZone2, Subnet: defaultTestSubnet}: 255,
+				{Zone: negtypes.TestZone3, Subnet: defaultTestSubnet}: 255,
 			},
 		},
 	}
@@ -506,11 +511,13 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 		t.Run(tC.desc, func(t *testing.T) {
 			// Arrange
 			nodeInformer := zonegetter.FakeNodeInformer()
-			zoneGetter, err := zonegetter.NewFakeZoneGetter(nodeInformer, zonegetter.FakeNodeTopologyInformer(), defaultTestSubnetURL, false)
+			zoneGetter, err := zonegetter.NewFakeZoneGetter(nodeInformer, nodeInformer, defaultTestSubnetURL, false)
 			if err != nil {
 				t.Fatalf("failed to initialize zone getter: %v", err)
 			}
-			zonegetter.PopulateFakeNodeInformer(nodeInformer, false)
+			for loc, count := range tC.nodesCount {
+				zonegetter.AddFakeNodesCount(zoneGetter, nodeInformer, loc.Zone, loc.Subnet, count)
+			}
 			zonegetter.SetNodeTopologyHasSynced(zoneGetter, func() bool { return true })
 			defaultNetwork := network.NetworkInfo{IsDefault: true, K8sNetwork: "default", SubnetworkURL: defaultTestSubnetURL}
 			svcKey := "testSvc"
@@ -528,10 +535,22 @@ func TestClusterWantedNEGsCount(t *testing.T) {
 				currentMap[loc] = negtypes.NewNetworkEndpointSet(make([]negtypes.NetworkEndpoint, count)...)
 			}
 
+			eds := make([]negtypes.EndpointsData, tC.podsCount)
+			for i := 0; i < tC.podsCount; i++ {
+				eds[i] = negtypes.EndpointsData{
+					Addresses: []negtypes.AddressData{
+						{
+							Ready:    true,
+							NodeName: ptr.To("this-is-duplicated-but-thats-okay"),
+						},
+					},
+				}
+			}
+
 			ec := NewClusterL4EndpointsCalculator(listers.NewNodeLister(nodeInformer.GetIndexer()), zoneGetter, svcKey, klog.TODO(), &defaultNetwork, lbType)
 
 			// Act
-			res, _, _, err := ec.CalculateEndpoints(tC.endpoints, currentMap)
+			res, _, _, err := ec.CalculateEndpoints(eds, currentMap)
 
 			// Assert
 			if err != nil {
