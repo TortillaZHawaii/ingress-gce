@@ -215,10 +215,16 @@ func (l *ClusterL4EndpointsCalculator) wantedNEGsCount(eds []types.EndpointsData
 
 func linearEndpointsPerPods(zoneSubnetPairCount, endpointsCount, subsetSizeLimit int) int {
 	const minCountPerZoneSubnetPair = 3
-	mini := zoneSubnetPairCount * minCountPerZoneSubnetPair
-	maxi := subsetSizeLimit
+	lowerZonalBasedBound := zoneSubnetPairCount * minCountPerZoneSubnetPair
+	upperLimit := subsetSizeLimit
 
-	return min(max(endpointsCount, mini), maxi)
+	return min(
+		upperLimit,
+		max(
+			endpointsCount,
+			lowerZonalBasedBound,
+		),
+	)
 }
 
 func negsLen(m map[negtypes.NEGLocation]types.NetworkEndpointSet) int {
@@ -232,7 +238,13 @@ func negsLen(m map[negtypes.NEGLocation]types.NetworkEndpointSet) int {
 func edsLen(eds []types.EndpointsData) int {
 	total := 0
 	for _, ed := range eds {
-		total += len(ed.Addresses)
+		// total += len(ed.Addresses)
+		for _, addr := range ed.Addresses {
+			if addr.NodeName == nil || addr.TargetRef == nil {
+				continue
+			}
+			total++
+		}
 	}
 	return total
 }
