@@ -3,7 +3,6 @@ package forwardingrules
 import (
 	"fmt"
 
-	cloudprovider "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"k8s.io/cloud-provider-gcp/providers/gce"
@@ -69,10 +68,10 @@ func (frc *ForwardingRules) List(filter filter.F) ([]*composite.ForwardingRule, 
 	}
 
 	// based on pkg/composite/gen.go/ListForwardingRules
-	ctx, cancel := cloudprovider.ContextWithCallTimeout()
-	defer cancel()
-	mc := compositemetrics.NewMetricContext("ForwardingRule", "list", key.Region, key.Zone, string(frc.version))
-
+	// ctx, cancel := cloudprovider.ContextWithCallTimeout()
+	// defer cancel()
+	// mc := compositemetrics.NewMetricContext("ForwardingRule", "list", key.Region, key.Zone, string(frc.version))
+	return nil, nil
 }
 
 func (frc *ForwardingRules) Delete(name string) error {

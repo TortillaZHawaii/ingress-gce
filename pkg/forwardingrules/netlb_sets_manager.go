@@ -27,13 +27,17 @@ type EnsureResult struct {
 	IPManaged       address.IPAddressType
 }
 
+// EnsureIPv4 creates or updates existing set of Forwarding Rules based on the Service definition.
 func (m *NetLBSetsManager) EnsureIPv4(backendServiceLink string) (EnsureResult, error) {
 	// log := m.Logger.WithName("EnsureIPv4")
 	return EnsureResult{}, nil
 }
 
-func (m *NetLBSetsManager) GetIPv4(backendServiceLink string) ([]*composite.ForwardingRule, error) {
-	log := m.Logger.WithName("GetIPv4")
+// ListIPv4 returns all of the GCE Forwarding Rules managed for the LB.
+func (m *NetLBSetsManager) ListIPv4(backendServiceLink string) ([]*composite.ForwardingRule, error) {
+	// log := m.Logger.WithName("GetIPv4")
 
 	return nil, nil
 }
+
+//
