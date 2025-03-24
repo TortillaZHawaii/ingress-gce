@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -108,6 +109,82 @@ func TestGetForwardingRule(t *testing.T) {
 			if !cmp.Equal(fr, tc.expectedFwdRule, ignoreFields) {
 				diff := cmp.Diff(fr, tc.expectedFwdRule, ignoreFields)
 				t.Errorf("frc.Get(s) returned %v, not equal to expectedFwdRule %v, diff: %v", fr, tc.expectedFwdRule, diff)
+			}
+		})
+	}
+}
+
+func TestListForwardingRules(t *testing.T) {
+	elbForwardingRule := &composite.ForwardingRule{
+		Name:                "NetLB",
+		LoadBalancingScheme: string(cloud.SchemeExternal),
+		Version:             meta.VersionGA,
+	}
+	ilbForwardingRule := &composite.ForwardingRule{
+		Name:                "ILB",
+		LoadBalancingScheme: string(cloud.SchemeInternal),
+		Version:             meta.VersionGA,
+	}
+
+	testCases := []struct {
+		desc             string
+		existingFwdRules []*composite.ForwardingRule
+		filter           *filter.F
+		want             []*composite.ForwardingRule
+	}{
+		{
+			desc:             "empty",
+			existingFwdRules: nil,
+			filter:           filter.None,
+			want:             nil,
+		},
+		{
+			desc:             "all",
+			existingFwdRules: []*composite.ForwardingRule{elbForwardingRule, ilbForwardingRule},
+			filter:           filter.None,
+			want:             []*composite.ForwardingRule{elbForwardingRule, ilbForwardingRule},
+		},
+		{
+			desc:             "NetLB",
+			existingFwdRules: []*composite.ForwardingRule{elbForwardingRule, ilbForwardingRule},
+			filter:           filter.Regexp("Name", "NetLB"),
+			want:             []*composite.ForwardingRule{elbForwardingRule},
+		},
+		{
+			desc:             "ends with LB",
+			existingFwdRules: []*composite.ForwardingRule{elbForwardingRule, ilbForwardingRule},
+			filter:           filter.Regexp("Name", ".*LB$"),
+			want:             []*composite.ForwardingRule{elbForwardingRule, ilbForwardingRule},
+		},
+		{
+			desc:             "and",
+			existingFwdRules: []*composite.ForwardingRule{elbForwardingRule, ilbForwardingRule},
+			filter:           filter.Regexp("Name", "NetLB").AndRegexp("Name", "ILB"),
+			want:             nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// Arrange
+			fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
+			frc := New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+			mustCreateForwardingRules(t, fakeGCE, tc.existingFwdRules)
+
+			// Act
+			got, err := frc.List(tc.filter)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("frc.List(%v), returned error %v, want nil", tc.filter, err)
+			}
+
+			ignore := cmpopts.IgnoreFields(composite.ForwardingRule{}, "SelfLink", "Region")
+			sort := cmpopts.SortSlices(func(x, y *composite.ForwardingRule) bool {
+				return x.Name < y.Name
+			})
+			if diff := cmp.Diff(got, tc.want, ignore, sort); diff != "" {
+				t.Errorf("frc.List(%v) mismatch (-want +got):\n%s", tc.filter, diff)
 			}
 		})
 	}

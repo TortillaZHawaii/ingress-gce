@@ -1,12 +1,15 @@
 package forwardingrules
 
 import (
+	"encoding/json"
 	"fmt"
 
+	cloudprovider "github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"k8s.io/cloud-provider-gcp/providers/gce"
 	"k8s.io/ingress-gce/pkg/composite"
+	compositemetrics "k8s.io/ingress-gce/pkg/composite/metrics"
 	"k8s.io/ingress-gce/pkg/utils"
 	"k8s.io/klog/v2"
 )
@@ -61,17 +64,65 @@ func (frc *ForwardingRules) Get(name string) (*composite.ForwardingRule, error) 
 // List will list all of the Forwarding Rules in GCE matching the filter.
 //
 // ListForwardingRules in pkg/composite/gen.go doesn't let us pass filters which necessitates
-func (frc *ForwardingRules) List(filter filter.F) ([]*composite.ForwardingRule, error) {
+// copying most of the code from there and adding an option to pass filter.
+func (frc *ForwardingRules) List(filter *filter.F) ([]*composite.ForwardingRule, error) {
 	key, err := frc.createKey("")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create key for listing forwarding rules, err: %w", err)
+		return nil, fmt.Errorf("failed to create key for listing forwarding rules, err: %w", err)
 	}
 
 	// based on pkg/composite/gen.go/ListForwardingRules
-	// ctx, cancel := cloudprovider.ContextWithCallTimeout()
-	// defer cancel()
-	// mc := compositemetrics.NewMetricContext("ForwardingRule", "list", key.Region, key.Zone, string(frc.version))
-	return nil, nil
+	// however ListForwardingRules doesn't allow passing in filters,
+	// which we need to use regular expressions to find Forwarding Rules
+	// only for specific LBs.
+	logger := frc.logger.WithName("List")
+	ctx, cancel := cloudprovider.ContextWithCallTimeout()
+	defer cancel()
+	mc := compositemetrics.NewMetricContext("ForwardingRule", "list", key.Region, key.Zone, string(frc.version))
+
+	var gceObjs interface{}
+	switch frc.version {
+	case meta.VersionAlpha:
+		switch key.Type() {
+		case meta.Regional:
+			logger.Info("Listing alpha region ForwardingRule")
+			gceObjs, err = frc.cloud.Compute().AlphaForwardingRules().List(ctx, key.Region, filter)
+		default:
+			logger.Info("Listing alpha ForwardingRule")
+			gceObjs, err = frc.cloud.Compute().AlphaGlobalForwardingRules().List(ctx, filter)
+		}
+	case meta.VersionBeta:
+		switch key.Type() {
+		case meta.Regional:
+			logger.Info("Listing beta region ForwardingRule")
+			gceObjs, err = frc.cloud.Compute().BetaForwardingRules().List(ctx, key.Region, filter)
+		default:
+			logger.Info("Listing beta ForwardingRule")
+			gceObjs, err = frc.cloud.Compute().BetaGlobalForwardingRules().List(ctx, filter)
+		}
+	default:
+		switch key.Type() {
+		case meta.Regional:
+			logger.Info("Listing ga region ForwardingRule")
+			gceObjs, err = frc.cloud.Compute().ForwardingRules().List(ctx, key.Region, filter)
+		default:
+			logger.Info("Listing ga ForwardingRule")
+			gceObjs, err = frc.cloud.Compute().GlobalForwardingRules().List(ctx, filter)
+		}
+	}
+	err = mc.Observe(err)
+	if err != nil {
+		return nil, err
+	}
+
+	compositeObjs, err := toForwardingRuleList(gceObjs)
+	if err != nil {
+		return nil, err
+	}
+	for _, obj := range compositeObjs {
+		obj.Version = frc.version
+	}
+	return compositeObjs, nil
 }
 
 func (frc *ForwardingRules) Delete(name string) error {
@@ -88,4 +139,25 @@ func (frc *ForwardingRules) Delete(name string) error {
 
 func (frc *ForwardingRules) createKey(name string) (*meta.Key, error) {
 	return composite.CreateKey(frc.cloud, name, frc.scope)
+}
+
+// toForwardingRuleList converts a list of compute alpha, beta or GA
+// ForwardingRule into a list of our composite type.
+func toForwardingRuleList(objs interface{}) ([]*composite.ForwardingRule, error) {
+	result := []*composite.ForwardingRule{}
+
+	err := copyViaJSON(&result, objs)
+	if err != nil {
+		return nil, fmt.Errorf("could not copy object %v to %T via JSON: %v", objs, result, err)
+	}
+	return result, nil
+}
+
+func copyViaJSON(dest interface{}, src interface{}) error {
+	var err error
+	bytes, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bytes, dest)
 }
