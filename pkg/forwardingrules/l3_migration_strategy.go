@@ -1,43 +1,56 @@
 package forwardingrules
 
 import (
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	api_v1 "k8s.io/api/core/v1"
 	"k8s.io/ingress-gce/pkg/composite"
 )
 
 type L3MigrationStrategy struct {
+	BackendServiceLink string
+	Service            *api_v1.Service
+	ForwardingRules    []*composite.ForwardingRule
+	Provider           Provider
+	Namer              Namer
 }
 
-func (l3ms *L3MigrationStrategy) Matches(service *api_v1.Service, forwardingRules []*composite.ForwardingRule) bool {
-	if l3ms.containsRangeForwardingRule(forwardingRules) && l3ms.requiresMultipleDiscreteForwardingRulesPerProtocol(service) {
-		return true
+func (l3ms *L3MigrationStrategy) Matches() bool {
+	count := l3ms.portsCountWantedPerProtocol(l3ms.Service)
+
+	for _, fr := range l3ms.ForwardingRules {
+		if fr.PortRange == "" {
+			continue
+		}
+
+		if count[api_v1.Protocol(fr.IPProtocol)] > MaxDiscretePorts {
+			return true
+		}
 	}
+
 	return false
 }
 
-func (l3ms *L3MigrationStrategy) Apply(service *api_v1.Service, provider Provider, namer Namer) (func() error, error) {
-	name := namer.L4ForwardingRule(service.Namespace, service.Name, "l3tmp")
-	if err := provider.Create(&composite.ForwardingRule{}); err != nil {
+func (l3ms *L3MigrationStrategy) Apply() (func() error, error) {
+	name := l3ms.Namer.L4ForwardingRule(l3ms.Service.Namespace, l3ms.Service.Name, "l3tmp")
+	if err := l3ms.Provider.Create(&composite.ForwardingRule{
+		Name:           name,
+		IPProtocol:     "L3_DEFAULT",
+		AllPorts:       true,
+		BackendService: l3ms.BackendServiceLink,
+		Version:        meta.VersionGA,
+		Scope:          meta.Regional,
+	}); err != nil {
 		return nil, err
 	}
 
 	return func() error {
-		return provider.Delete(name)
+		return l3ms.Provider.Delete(name)
 	}, nil
 }
 
-func (l3ms *L3MigrationStrategy) containsRangeForwardingRule(frs []*composite.ForwardingRule) bool {
-	for _, fr := range frs {
-		if len(fr.Ports) == 0 && fr.PortRange != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func (l3ms *L3MigrationStrategy) requiresMultipleDiscreteForwardingRulesPerProtocol(service *api_v1.Service) bool {
+func (l3ms *L3MigrationStrategy) portsCountWantedPerProtocol(service *api_v1.Service) map[api_v1.Protocol]int {
 	const defaultPort = api_v1.ProtocolTCP
-	portsCountPerProtocol := make(map[api_v1.Protocol]int)
+	count := make(map[api_v1.Protocol]int)
 
 	for _, port := range service.Spec.Ports {
 		protocol := port.Protocol
@@ -45,13 +58,8 @@ func (l3ms *L3MigrationStrategy) requiresMultipleDiscreteForwardingRulesPerProto
 			protocol = defaultPort
 		}
 
-		portsCountPerProtocol[protocol]++
+		count[protocol]++
 	}
 
-	for _, count := range portsCountPerProtocol {
-		if count > MaxDiscretePorts {
-			return true
-		}
-	}
-	return false
+	return count
 }
