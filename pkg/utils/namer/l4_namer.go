@@ -2,6 +2,7 @@ package namer
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/ingress-gce/pkg/utils/common"
@@ -132,6 +133,15 @@ func (namer *L4Namer) L4ForwardingRule(namespace, name, protocol string) string 
 	}, "-")
 }
 
+// L4NetLBForwardingRule for sets
+// TODO
+func (namer *L4Namer) L4NetLBForwardingRule(namespace, name, protocol string, frNumber uint) string {
+	return GetSuffixedName(
+		namer.L4ForwardingRule(namespace, name, protocol),
+		netLbNumberSuffix(frNumber),
+	)
+}
+
 // L4HealthCheck returns the name of the L4 LB Healthcheck
 func (namer *L4Namer) L4HealthCheck(namespace, name string, shared bool) string {
 	if shared {
@@ -158,6 +168,17 @@ func (namer *L4Namer) L4HealthCheckFirewall(namespace, name string, shared bool)
 // Output name is at most 63 characters.
 func (namer *L4Namer) L4IPv6ForwardingRule(namespace, name, protocol string) string {
 	return GetSuffixedName(namer.L4ForwardingRule(namespace, name, protocol), "-"+ipv6Suffix)
+}
+
+// L4NetLBIPv6ForwardingRule for sets
+// TODO
+func (namer *L4Namer) L4NetLBIPv6ForwardingRule(namespace, name, protocol string, frNumber uint) string {
+	numberSuffix := netLbNumberSuffix(frNumber)
+	// We cannot cut the number suffix regardless of length of the total name
+	return GetSuffixedName(
+		namer.L4ForwardingRule(namespace, name, protocol),
+		numberSuffix+"-"+ipv6Suffix,
+	)
 }
 
 // L4IPv6HealthCheckFirewall returns the name of the IPv6 L4 LB health check firewall rule.
@@ -201,4 +222,15 @@ func ensureSpaceForSuffix(name string, suffix string) string {
 		name = name[:maxRealNameLen]
 	}
 	return name
+}
+
+func netLbNumberSuffix(frNumber uint) string {
+	const base36 = 36
+	base36Num := strconv.FormatUint(uint64(frNumber), base36)
+	paddingTo2Places := ""
+	if len(base36Num) == 1 {
+		paddingTo2Places = "0"
+	}
+	suffixWithLeadingZeros := fmt.Sprintf("-%s%s", paddingTo2Places, base36Num)
+	return suffixWithLeadingZeros
 }
