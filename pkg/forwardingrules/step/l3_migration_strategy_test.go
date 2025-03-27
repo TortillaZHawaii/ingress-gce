@@ -1,4 +1,4 @@
-package forwardingrules
+package step_test
 
 import (
 	"testing"
@@ -10,6 +10,8 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cloud-provider-gcp/providers/gce"
 	"k8s.io/ingress-gce/pkg/composite"
+	"k8s.io/ingress-gce/pkg/forwardingrules"
+	"k8s.io/ingress-gce/pkg/forwardingrules/step"
 	"k8s.io/ingress-gce/pkg/utils/namer"
 	"k8s.io/klog/v2"
 )
@@ -294,7 +296,7 @@ func TestMatches(t *testing.T) {
 					Ports: tC.ports,
 				},
 			}
-			strategy := &L3MigrationStrategy{
+			strategy := &step.L3MigrationStrategy{
 				ForwardingRules: tC.forwardingRules,
 				Service:         service,
 			}
@@ -346,10 +348,10 @@ func TestApply(t *testing.T) {
 			}
 			vals := gce.DefaultTestClusterValues()
 			fakeGCE := gce.NewFakeGCECloud(vals)
-			provider := New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+			provider := forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
 			namer := namer.NewL4Namer("123", nil)
 
-			strategy := &L3MigrationStrategy{
+			strategy := &step.L3MigrationStrategy{
 				BackendServiceLink: "test-bs",
 				Service:            service,
 				Provider:           provider,

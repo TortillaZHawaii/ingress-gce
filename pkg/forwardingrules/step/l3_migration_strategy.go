@@ -1,9 +1,10 @@
-package forwardingrules
+package step
 
 import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	api_v1 "k8s.io/api/core/v1"
 	"k8s.io/ingress-gce/pkg/composite"
+	"k8s.io/ingress-gce/pkg/forwardingrules/netlb"
 )
 
 type L3MigrationStrategy struct {
@@ -22,7 +23,7 @@ func (l3ms *L3MigrationStrategy) Matches() bool {
 			continue
 		}
 
-		if count[api_v1.Protocol(fr.IPProtocol)] > MaxDiscretePorts {
+		if count[api_v1.Protocol(fr.IPProtocol)] > netlb.MaxDiscretePorts {
 			return true
 		}
 	}

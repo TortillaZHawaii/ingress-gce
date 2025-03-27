@@ -1,4 +1,4 @@
-package forwardingrules
+package step
 
 import (
 	"fmt"
@@ -8,12 +8,9 @@ import (
 	"k8s.io/ingress-gce/pkg/composite"
 )
 
-type CleanPortsStrategy struct {
-}
-
 type protocolPorts map[api_v1.Protocol]sets.Set[string]
 
-func (cps *CleanPortsStrategy) Clean(forwardingRules []*composite.ForwardingRule, service *api_v1.Service) []*composite.ForwardingRule {
+func RemoveUnusedPorts(forwardingRules []*composite.ForwardingRule, service *api_v1.Service) []*composite.ForwardingRule {
 	cleaned := make([]*composite.ForwardingRule, 0, len(forwardingRules))
 	wantedPorts := portsMap(service.Spec.Ports)
 

@@ -1,4 +1,4 @@
-package forwardingrules
+package step
 
 import (
 	"slices"
@@ -6,9 +6,10 @@ import (
 	api_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/ingress-gce/pkg/composite"
+	"k8s.io/ingress-gce/pkg/forwardingrules/netlb"
 )
 
-func (cps *CleanPortsStrategy) Add(forwardingRules []*composite.ForwardingRule, service *api_v1.Service) []*composite.ForwardingRule {
+func AddMissingPorts(forwardingRules []*composite.ForwardingRule, service *api_v1.Service) []*composite.ForwardingRule {
 	want := portsMap(service.Spec.Ports)
 	have := haveMap(forwardingRules)
 	diff := make(protocolPorts)
@@ -61,12 +62,12 @@ func addPortsToExistingRules(forwardingRules []*composite.ForwardingRule, portsT
 	})
 
 	for _, fr := range forwardingRules {
-		reachedFullFRs := MaxDiscretePorts == len(fr.Ports)
+		reachedFullFRs := netlb.MaxDiscretePorts == len(fr.Ports)
 		if portsToAdd.Len() == 0 || reachedFullFRs {
 			break
 		}
 
-		for len(fr.Ports) < MaxDiscretePorts && portsToAdd.Len() > 0 {
+		for len(fr.Ports) < netlb.MaxDiscretePorts && portsToAdd.Len() > 0 {
 			port, ok := portsToAdd.PopAny()
 			if !ok { // This shouldn't happen as we check for Len before popping
 				break
@@ -79,12 +80,12 @@ func addPortsToExistingRules(forwardingRules []*composite.ForwardingRule, portsT
 }
 
 func createNewRulesForLeftPorts(portsLeft sets.Set[string], protocol api_v1.Protocol) []*composite.ForwardingRule {
-	frsNeededCount := (portsLeft.Len() + MaxDiscretePorts - 1) / MaxDiscretePorts
+	frsNeededCount := (portsLeft.Len() + netlb.MaxDiscretePorts - 1) / netlb.MaxDiscretePorts
 	frs := make([]*composite.ForwardingRule, 0, frsNeededCount)
 
 	for _ = range frsNeededCount {
-		ports := make([]string, 0, MaxDiscretePorts)
-		for len(ports) < MaxDiscretePorts && portsLeft.Len() > 0 {
+		ports := make([]string, 0, netlb.MaxDiscretePorts)
+		for len(ports) < netlb.MaxDiscretePorts && portsLeft.Len() > 0 {
 			port, ok := portsLeft.PopAny()
 			if !ok { // This shouldn't happen as we check for Len before popping
 				break
