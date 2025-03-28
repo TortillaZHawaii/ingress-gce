@@ -227,10 +227,13 @@ func ensureSpaceForSuffix(name string, suffix string) string {
 func netLbNumberSuffix(frNumber uint) string {
 	const base36 = 36
 	base36Num := strconv.FormatUint(uint64(frNumber), base36)
-	paddingTo2Places := ""
-	if len(base36Num) == 1 {
-		paddingTo2Places = "0"
+	padding := ""
+	switch len(base36Num) {
+	case 1:
+		padding = "00"
+	case 2:
+		padding = "0"
 	}
-	suffixWithLeadingZeros := fmt.Sprintf("-%s%s", paddingTo2Places, base36Num)
+	suffixWithLeadingZeros := fmt.Sprintf("-%s%s", padding, base36Num)
 	return suffixWithLeadingZeros
 }

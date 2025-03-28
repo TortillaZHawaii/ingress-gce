@@ -47,9 +47,9 @@ func TestL4Namer(t *testing.T) {
 			sharedHC:   false,
 			want: names{
 				FRName:            "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x",
-				NetLbFRName:       "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-0a",
+				NetLbFRName:       "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-00a",
 				IPv6FRName:        "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-ipv6",
-				NetLbIPv6FRName:   "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-0a-ipv6",
+				NetLbIPv6FRName:   "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-00a-ipv6",
 				NEGName:           "k8s2-7kpbhpki-namespace-name-956p2p7x",
 				NonDefaultNEGName: "k8s2-7kpbhpki-namespace-name-185075-956p2p7x",
 				FWName:            "k8s2-7kpbhpki-namespace-name-956p2p7x",
@@ -68,9 +68,9 @@ func TestL4Namer(t *testing.T) {
 			sharedHC:   true,
 			want: names{
 				FRName:            "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x",
-				NetLbFRName:       "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-0a",
+				NetLbFRName:       "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-00a",
 				IPv6FRName:        "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-ipv6",
-				NetLbIPv6FRName:   "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-0a-ipv6",
+				NetLbIPv6FRName:   "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-00a-ipv6",
 				NEGName:           "k8s2-7kpbhpki-namespace-name-956p2p7x",
 				NonDefaultNEGName: "k8s2-7kpbhpki-namespace-name-185075-956p2p7x",
 				FWName:            "k8s2-7kpbhpki-namespace-name-956p2p7x",
@@ -89,9 +89,9 @@ func TestL4Namer(t *testing.T) {
 			sharedHC:   false,
 			want: names{
 				FRName:            "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm400mg",
-				NetLbFRName:       "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm40-0a",
+				NetLbFRName:       "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm4-00a",
 				IPv6FRName:        "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm-ipv6",
-				NetLbIPv6FRName:   "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456--0a-ipv6",
+				NetLbIPv6FRName:   "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-00a-ipv6",
 				NEGName:           "k8s2-7kpbhpki-01234567890123456789-0123456789012345678-hwm400mg",
 				NonDefaultNEGName: "k8s2-7kpbhpki-0123456789012345-0123456789012345-185075-hwm400mg",
 				FWName:            "k8s2-7kpbhpki-01234567890123456789-0123456789012345678-hwm400mg",
@@ -110,9 +110,9 @@ func TestL4Namer(t *testing.T) {
 			sharedHC:   true,
 			want: names{
 				FRName:            "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm400mg",
-				NetLbFRName:       "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm40-0a",
+				NetLbFRName:       "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm4-00a",
 				IPv6FRName:        "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-hwm-ipv6",
-				NetLbIPv6FRName:   "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456--0a-ipv6",
+				NetLbIPv6FRName:   "k8s2-udp-7kpbhpki-012345678901234567-01234567890123456-00a-ipv6",
 				NEGName:           "k8s2-7kpbhpki-01234567890123456789-0123456789012345678-hwm400mg",
 				NonDefaultNEGName: "k8s2-7kpbhpki-0123456789012345-0123456789012345-185075-hwm400mg",
 				FWName:            "k8s2-7kpbhpki-01234567890123456789-0123456789012345678-hwm400mg",
@@ -131,9 +131,9 @@ func TestL4Namer(t *testing.T) {
 			sharedHC:   false,
 			want: names{
 				FRName:            "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x",
-				NetLbFRName:       "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-0a",
+				NetLbFRName:       "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-00a",
 				IPv6FRName:        "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-ipv6",
-				NetLbIPv6FRName:   "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-0a-ipv6",
+				NetLbIPv6FRName:   "k8s2-tcp-7kpbhpki-namespace-name-956p2p7x-00a-ipv6",
 				NEGName:           "k8s2-7kpbhpki-namespace-name-956p2p7x",
 				NonDefaultNEGName: "k8s2-7kpbhpki-namespace-name-1fd834-956p2p7x",
 				FWName:            "k8s2-7kpbhpki-namespace-name-956p2p7x",
@@ -152,9 +152,9 @@ func TestL4Namer(t *testing.T) {
 			sharedHC:   false,
 			want: names{
 				FRName:            "k8s2-l3-7kpbhpki-namespace-name-956p2p7x",
-				NetLbFRName:       "k8s2-l3-7kpbhpki-namespace-name-956p2p7x-0a",
+				NetLbFRName:       "k8s2-l3-7kpbhpki-namespace-name-956p2p7x-00a",
 				IPv6FRName:        "k8s2-l3-7kpbhpki-namespace-name-956p2p7x-ipv6",
-				NetLbIPv6FRName:   "k8s2-l3-7kpbhpki-namespace-name-956p2p7x-0a-ipv6",
+				NetLbIPv6FRName:   "k8s2-l3-7kpbhpki-namespace-name-956p2p7x-00a-ipv6",
 				NEGName:           "k8s2-7kpbhpki-namespace-name-956p2p7x",
 				NonDefaultNEGName: "k8s2-7kpbhpki-namespace-name-1fd834-956p2p7x",
 				FWName:            "k8s2-7kpbhpki-namespace-name-956p2p7x",
@@ -173,9 +173,9 @@ func TestL4Namer(t *testing.T) {
 			sharedHC:   true,
 			want: names{
 				FRName:            "k8s2-l3-7kpbhpki-012345678901234567-012345678901234567-hwm400mg",
-				NetLbFRName:       "k8s2-l3-7kpbhpki-012345678901234567-012345678901234567-hwm40-0a",
+				NetLbFRName:       "k8s2-l3-7kpbhpki-012345678901234567-012345678901234567-hwm4-00a",
 				IPv6FRName:        "k8s2-l3-7kpbhpki-012345678901234567-012345678901234567-hwm-ipv6",
-				NetLbIPv6FRName:   "k8s2-l3-7kpbhpki-012345678901234567-012345678901234567--0a-ipv6",
+				NetLbIPv6FRName:   "k8s2-l3-7kpbhpki-012345678901234567-012345678901234567-00a-ipv6",
 				NEGName:           "k8s2-7kpbhpki-01234567890123456789-0123456789012345678-hwm400mg",
 				NonDefaultNEGName: "k8s2-7kpbhpki-0123456789012345-0123456789012345-185075-hwm400mg",
 				FWName:            "k8s2-7kpbhpki-01234567890123456789-0123456789012345678-hwm400mg",
@@ -228,7 +228,6 @@ func TestL4Namer(t *testing.T) {
 
 // TestL4NamerForwardingRulesNumbers verifies the conversion of the FR number for some edge cases
 // Other behavior is tested in TestL4Namer
-
 func TestL4NamerForwardingRulesNumbers(t *testing.T) {
 	const namespace, name, protocol = "default", "netlb-service", "TCP"
 	type netLbNames struct {
@@ -242,31 +241,52 @@ func TestL4NamerForwardingRulesNumbers(t *testing.T) {
 	}{
 		{
 			frNumber: 0,
-			want:     netLbNames{},
+			want: netLbNames{
+				IPv4: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-000",
+				IPv6: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-000-ipv6",
+			},
 		},
 		{
 			frNumber: 9,
-			want:     netLbNames{},
+			want: netLbNames{
+				IPv4: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-009",
+				IPv6: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-009-ipv6",
+			},
 		},
 		{
 			frNumber: 10,
-			want:     netLbNames{},
+			want: netLbNames{
+				IPv4: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-00a",
+				IPv6: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-00a-ipv6",
+			},
 		},
 		{
 			frNumber: 35,
-			want:     netLbNames{},
+			want: netLbNames{
+				IPv4: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-00z",
+				IPv6: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-00z-ipv6",
+			},
 		},
 		{
 			frNumber: 36,
-			want:     netLbNames{},
+			want: netLbNames{
+				IPv4: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-010",
+				IPv6: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-010-ipv6",
+			},
 		},
 		{
 			frNumber: 1000,
-			want:     netLbNames{},
+			want: netLbNames{
+				IPv4: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-0rs",
+				IPv6: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-0rs-ipv6",
+			},
 		},
 		{
 			frNumber: 13108,
-			want:     netLbNames{},
+			want: netLbNames{
+				IPv4: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-a44",
+				IPv6: "k8s2-tcp-7kpbhpki-default-netlb-service-y6efeqo7-a44-ipv6",
+			},
 		},
 	}
 
