@@ -1,10 +1,14 @@
 package steps
 
-import "k8s.io/ingress-gce/pkg/composite"
+import (
+	api_v1 "k8s.io/api/core/v1"
+	"k8s.io/ingress-gce/pkg/composite"
+)
 
-func RemovePortRanges(frs map[ResourceName]*composite.ForwardingRule) map[ResourceName]*composite.ForwardingRule {
+// RemovePortRanges from Forwarding Rules.
+func RemovePortRanges(_ []api_v1.ServicePort, frs []*composite.ForwardingRule) ([]*composite.ForwardingRule, error) {
 	for _, fr := range frs {
 		fr.PortRange = ""
 	}
-	return frs
+	return frs, nil
 }

@@ -12,8 +12,16 @@ import (
 
 type protocol string
 
-type nameFiller struct {
-	name func(fr *composite.ForwardingRule, number int) string
+// Name forwarding rule
+type Name func(protocol string, number int) string
+
+type setNamer struct {
+	name Name
+}
+
+// NewSetNamer returns new instance of setNamer.
+func NewSetNamer(name Name) *setNamer {
+	return &setNamer{name: name}
 }
 
 // FillNames fills empty names in Forwarding Rules with unique names.
@@ -22,7 +30,7 @@ type nameFiller struct {
 //
 // The function mutates frs map.
 // Time complexity is O(number of forwarding rules)
-func (nf *nameFiller) FillNames(_ []api_v1.ServicePort, frs map[ResourceName]*composite.ForwardingRule) error {
+func (sn *setNamer) FillNames(_ []api_v1.ServicePort, frs []*composite.ForwardingRule) error {
 	lastTried := make(map[protocol]int)
 	usedNums, err := usedNumbers(frs)
 	if err != nil {
@@ -34,7 +42,7 @@ func (nf *nameFiller) FillNames(_ []api_v1.ServicePort, frs map[ResourceName]*co
 
 		for fr.Name == "" {
 			if !usedNums[p].Has(lastTried[p]) {
-				fr.Name = nf.name(fr, lastTried[p])
+				fr.Name = sn.name(fr.IPProtocol, lastTried[p])
 			}
 
 			lastTried[p]++
@@ -44,7 +52,8 @@ func (nf *nameFiller) FillNames(_ []api_v1.ServicePort, frs map[ResourceName]*co
 	return nil
 }
 
-func usedNumbers(frs map[ResourceName]*composite.ForwardingRule) (map[protocol]sets.Set[int], error) {
+// usedNumbers returns a map of used forwarding rule numbers for each protocol.
+func usedNumbers(frs []*composite.ForwardingRule) (map[protocol]sets.Set[int], error) {
 	usedNums := make(map[protocol]sets.Set[int])
 
 	for _, fr := range frs {
@@ -94,6 +103,7 @@ func nameNumber(name string) (int, error) {
 	return parseNumber(numStr)
 }
 
+// parseNumber from base36 string to base10 int
 func parseNumber(numStr string) (int, error) {
 	// bitsize of 32 is enough for FR naming lengths
 	const base, bitSize = 36, 32

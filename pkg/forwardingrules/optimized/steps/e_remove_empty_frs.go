@@ -7,15 +7,16 @@ import (
 
 // RemoveEmptyForwardingRules removes Forwarding Rules that don't specify any discrete ports.
 // frs map is mutated.
-func RemoveEmptyForwardingRules(_ []api_v1.ServicePort, frs map[ResourceName]*composite.ForwardingRule) error {
-	for name, fr := range frs {
-		if isNonDiscrete := len(fr.PortRange) > 0 || fr.AllPorts; isNonDiscrete {
-			continue
-		}
+func RemoveEmptyForwardingRules(_ []api_v1.ServicePort, frs []*composite.ForwardingRule) ([]*composite.ForwardingRule, error) {
+	nonEmptyFRs := make([]*composite.ForwardingRule, 0, len(frs))
+	for _, fr := range frs {
+		isNonDiscrete := len(fr.PortRange) > 0 || fr.AllPorts
+		hasPorts := len(fr.Ports) > 0
 
-		if isEmpty := len(fr.Ports) == 0; isEmpty {
-			delete(frs, name)
+		if isNonDiscrete || hasPorts {
+			nonEmptyFRs = append(nonEmptyFRs, fr)
 		}
 	}
-	return nil
+
+	return nonEmptyFRs, nil
 }

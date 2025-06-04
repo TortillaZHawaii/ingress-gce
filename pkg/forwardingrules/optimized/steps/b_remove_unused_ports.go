@@ -11,29 +11,18 @@ import (
 
 // RemoveUnusedDiscretePorts removes discrete ports from Forwarding Rules, that are not present in wantPorts.
 // Objects from frs map are mutated.
-func RemoveUnusedDiscretePorts(wantPorts []api_v1.ServicePort, frs map[ResourceName]*composite.ForwardingRule) error {
+func RemoveUnusedDiscretePorts(wantPorts []api_v1.ServicePort, frs []*composite.ForwardingRule) ([]*composite.ForwardingRule, error) {
 	wanted := wantedPortsMap(wantPorts)
 
 	for _, fr := range frs {
-		// Removing items from list has O(n) time complexity, and adding has O(1)
-		// It should be faster to create a new list of ports skipping not used.
-		updatedPorts := make([]string, 0, len(fr.Ports))
-
-		for _, portStr := range fr.Ports {
-			port, err := parsePort(portStr)
-			if err != nil {
-				return err
-			}
-
-			if wanted[api_v1.ProtocolTCP].Has(port) {
-				updatedPorts = append(updatedPorts, portStr)
-			}
+		ports, err := withoutUnusedPorts(fr.Ports, wanted)
+		if err != nil {
+			return nil, err
 		}
-
-		fr.Ports = updatedPorts
+		fr.Ports = ports
 	}
 
-	return nil
+	return frs, nil
 }
 
 func wantedPortsMap(ports []api_v1.ServicePort) map[api_v1.Protocol]sets.Set[int32] {
@@ -53,6 +42,25 @@ func wantedPortsMap(ports []api_v1.ServicePort) map[api_v1.Protocol]sets.Set[int
 	}
 
 	return portsInProtocol
+}
+
+func withoutUnusedPorts(ports []string, wanted map[api_v1.Protocol]sets.Set[int32]) ([]string, error) {
+	// Removing items from list has O(n) time complexity, and adding has O(1)
+	// It should be faster to create a new list of ports skipping not used.
+	updatedPorts := make([]string, 0, len(ports))
+
+	for _, portStr := range ports {
+		port, err := parsePort(portStr)
+		if err != nil {
+			return nil, err
+		}
+
+		if wanted[api_v1.ProtocolTCP].Has(port) {
+			updatedPorts = append(updatedPorts, portStr)
+		}
+	}
+
+	return updatedPorts, nil
 }
 
 // parsePort parses port from string to int32.
