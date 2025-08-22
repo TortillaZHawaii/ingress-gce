@@ -544,7 +544,7 @@ func (l4c *L4Controller) sync(key string, svcLogger klog.Logger) error {
 			return nil
 		}
 		l4c.serviceVersions.Delete(key)
-		l4c.publishMetrics(result, namespacedName, false, svcLogger)
+		l4c.publishMetrics(result, namespacedName, svc.Spec.Ports, false, svcLogger)
 		return skipUserError(result.Error, svcLogger)
 	}
 	// Check again here, to avoid time-of check, time-of-use race. A service queued by informer could have changed, no
@@ -562,7 +562,7 @@ func (l4c *L4Controller) sync(key string, svcLogger klog.Logger) error {
 				svcLogger.V(3).Error(nil, "Resources were modified but this was not expected for a resync.", "modifiedResources", result.ResourceUpdates.String())
 			}
 		}
-		l4c.publishMetrics(result, namespacedName, isResync, svcLogger)
+		l4c.publishMetrics(result, namespacedName, svc.Spec.Ports, isResync, svcLogger)
 		l4c.serviceVersions.SetProcessed(key, svc.ResourceVersion, result.Error == nil, isResync, svcLogger)
 		return skipUserError(result.Error, svcLogger)
 	}
@@ -676,10 +676,11 @@ func (l4c *L4Controller) needsUpdate(oldService *v1.Service, newService *v1.Serv
 }
 
 // publishMetrics this function sets controller metrics for ILB services and pushed ILB metrics based on sync type.
-func (l4c *L4Controller) publishMetrics(result *loadbalancers.L4ILBSyncResult, namespacedName string, isResync bool, svcLogger klog.Logger) {
+func (l4c *L4Controller) publishMetrics(result *loadbalancers.L4ILBSyncResult, namespacedName string, ports []v1.ServicePort, isResync bool, svcLogger klog.Logger) {
 	if result == nil {
 		return
 	}
+	protocol := metrics.ProtocolTypeFrom(ports)
 	switch result.SyncType {
 	case loadbalancers.SyncTypeCreate, loadbalancers.SyncTypeUpdate:
 		svcLogger.V(2).Info("Internal L4 Loadbalancer for Service ensured, updating its state in metrics cache", "serviceState", result.MetricsLegacyState)
@@ -687,7 +688,7 @@ func (l4c *L4Controller) publishMetrics(result *loadbalancers.L4ILBSyncResult, n
 		l4c.ctx.L4Metrics.SetL4ILBService(namespacedName, result.MetricsState)
 		isWeightedLB := result.MetricsState.WeightedLBPodsPerNode
 		isZonalAffinityLB := result.MetricsState.ZonalAffinity
-		metrics.PublishILBSyncMetrics(result.Error == nil, result.SyncType, result.GCEResourceInError, utils.GetErrorType(result.Error), result.StartTime, isResync, isWeightedLB, isZonalAffinityLB)
+		metrics.PublishILBSyncMetrics(result.Error == nil, result.SyncType, result.GCEResourceInError, utils.GetErrorType(result.Error), result.StartTime, isResync, isWeightedLB, protocol, isZonalAffinityLB)
 		if l4c.enableDualStack {
 			svcLogger.V(2).Info("Internal L4 DualStack Loadbalancer for Service ensured, updating its state in metrics cache", "serviceState", result.MetricsState)
 			metrics.PublishL4ILBDualStackSyncLatency(result.Error == nil, result.SyncType, result.MetricsState.IPFamilies, result.StartTime, isResync)
@@ -706,7 +707,7 @@ func (l4c *L4Controller) publishMetrics(result *loadbalancers.L4ILBSyncResult, n
 		}
 		isWeightedLB := result.MetricsState.WeightedLBPodsPerNode
 		isZonalAffinityLB := result.MetricsState.ZonalAffinity
-		metrics.PublishILBSyncMetrics(result.Error == nil, result.SyncType, result.GCEResourceInError, utils.GetErrorType(result.Error), result.StartTime, false, isWeightedLB, isZonalAffinityLB)
+		metrics.PublishILBSyncMetrics(result.Error == nil, result.SyncType, result.GCEResourceInError, utils.GetErrorType(result.Error), result.StartTime, false, isWeightedLB, protocol, isZonalAffinityLB)
 		if l4c.enableDualStack {
 			metrics.PublishL4ILBDualStackSyncLatency(result.Error == nil, result.SyncType, result.MetricsState.IPFamilies, result.StartTime, false)
 		}

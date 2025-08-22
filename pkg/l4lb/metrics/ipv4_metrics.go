@@ -71,7 +71,7 @@ func InitServiceMetricsState(svc *corev1.Service, startTime *time.Time, isMultin
 			WeightedLBPodsPerNode: isWeightedLBPodsPerNode,
 			BackendType:           backendType,
 			ZonalAffinity:         isLBWithZonalAffinity,
-			Protocol:              protocolTypeFrom(svc),
+			Protocol:              ProtocolTypeFrom(svc.Spec.Ports),
 		},
 		// Always init status with error, and update with Success when service was provisioned
 		Status:             StatusError,
@@ -84,13 +84,13 @@ func InitServiceMetricsState(svc *corev1.Service, startTime *time.Time, isMultin
 	return state
 }
 
-func protocolTypeFrom(svc *corev1.Service) L4ProtocolType {
+func ProtocolTypeFrom(ports []corev1.ServicePort) L4ProtocolType {
 	switch {
-	case forwardingrules.NeedsMixed(svc.Spec.Ports):
+	case forwardingrules.NeedsMixed(ports):
 		return L4ProtocolTypeMixed
-	case forwardingrules.NeedsUDP(svc.Spec.Ports):
+	case forwardingrules.NeedsUDP(ports):
 		return L4ProtocolTypeUDP
-	case forwardingrules.NeedsTCP(svc.Spec.Ports):
+	case forwardingrules.NeedsTCP(ports):
 		return L4ProtocolTypeTCP
 	}
 	return L4ProtocolTypeUnknown
