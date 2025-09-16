@@ -62,6 +62,12 @@ func TestEnsureMixedNetLB(t *testing.T) {
 			annotations: mixedprotocolnetlbtest.AnnotationsMixed(),
 			ingress:     mixedprotocolnetlbtest.IPv4Ingress(),
 		},
+		{
+			desc:        "ipv6 tcp",
+			resources:   mixedprotocolnetlbtest.TCPResourcesIPv6(),
+			annotations: mixedprotocolnetlbtest.AnnotationsTCPIPv6(),
+			ingress:     mixedprotocolnetlbtest.IPv6Ingress(),
+		},
 	}
 
 	endState := []struct {
@@ -89,6 +95,12 @@ func TestEnsureMixedNetLB(t *testing.T) {
 			spec:        mixedprotocoltest.SpecIPv4([]int32{80, 443}, []int32{53}),
 			annotations: mixedprotocolnetlbtest.AnnotationsMixed(),
 			resources:   mixedprotocolnetlbtest.MixedResources(),
+		},
+		{
+			desc:        "ipv6 tcp",
+			spec:        mixedprotocoltest.SpecIPv6([]int32{80, 443}, nil),
+			resources:   mixedprotocolnetlbtest.TCPResourcesIPv6(),
+			annotations: mixedprotocolnetlbtest.AnnotationsTCPIPv6(),
 		},
 	}
 

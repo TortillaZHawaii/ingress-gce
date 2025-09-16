@@ -84,7 +84,7 @@ func VerifyResourcesExist(t *testing.T, cloud *gce.Cloud, want GCEResources) {
 		}
 		ignoreFields := cmpopts.IgnoreFields(compute.ForwardingRule{}, "SelfLink")
 		if diff := cmp.Diff(wantFr, fr, ignoreFields); diff != "" {
-			t.Errorf("Forwarding rule mismatch (-want +got):\n%s", diff)
+			t.Errorf("Forwarding rule mismatch  (%v) (-want +got):\n%s", wantFr.Name, diff)
 		}
 	}
 
@@ -96,7 +96,7 @@ func VerifyResourcesExist(t *testing.T, cloud *gce.Cloud, want GCEResources) {
 		ignoreFields := cmpopts.IgnoreFields(compute.Firewall{}, "SelfLink")
 		sortSourceRanges := cmpopts.SortSlices(func(x, y string) bool { return x < y })
 		if diff := cmp.Diff(wantFw, fw, ignoreFields, sortSourceRanges); diff != "" {
-			t.Errorf("Firewall mismatch (-want +got):\n%s", diff)
+			t.Errorf("Firewall mismatch (%v) (-want +got):\n%s", wantFw.Name, diff)
 		}
 	}
 

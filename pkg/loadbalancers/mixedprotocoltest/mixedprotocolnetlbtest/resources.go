@@ -26,6 +26,25 @@ func TCPResources() mixedprotocoltest.GCEResources {
 	}
 }
 
+// TCPResources returns GCE resources for a TCP IPv6 NetLB that listens on ports 80 and 443
+func TCPResourcesIPv6() mixedprotocoltest.GCEResources {
+	return mixedprotocoltest.GCEResources{
+		ForwardingRules: map[string]*compute.ForwardingRule{
+			mixedprotocoltest.ForwardingRuleLegacyIPv6Name: ForwardingRuleTCPIPv6(
+				mixedprotocoltest.ForwardingRuleLegacyIPv6Name, []string{"80", "443"},
+			),
+		},
+		Firewalls: map[string]*compute.Firewall{
+			mixedprotocoltest.FirewallIPv6Name: mixedprotocoltest.FirewallIPv6([]*compute.FirewallAllowed{
+				{IPProtocol: "tcp", Ports: []string{"80", "443"}},
+			}),
+			mixedprotocoltest.HealthCheckFirewallIPv6Name: HealthCheckFirewallIPv6(),
+		},
+		HealthCheck:    HealthCheck(),
+		BackendService: BackendService("TCP"),
+	}
+}
+
 // UDPResources returns GCE resources for an UDP IPv4 NetLB that listens on port 53
 func UDPResources() mixedprotocoltest.GCEResources {
 	return mixedprotocoltest.GCEResources{
@@ -49,12 +68,7 @@ func UDPResources() mixedprotocoltest.GCEResources {
 func MixedResources() mixedprotocoltest.GCEResources {
 	return mixedprotocoltest.GCEResources{
 		ForwardingRules: map[string]*compute.ForwardingRule{
-			mixedprotocoltest.ForwardingRuleTCPIPv4Name: ForwardingRuleTCP(
-				mixedprotocoltest.ForwardingRuleTCPIPv4Name, []string{"80", "443"},
-			),
-			mixedprotocoltest.ForwardingRuleUDPIPv4Name: ForwardingRuleUDP(
-				mixedprotocoltest.ForwardingRuleUDPIPv4Name, []string{"53"},
-			),
+			mixedprotocoltest.ForwardingRuleLegacyName: ForwardingRuleL3(mixedprotocoltest.ForwardingRuleLegacyName),
 		},
 		Firewalls: map[string]*compute.Firewall{
 			mixedprotocoltest.FirewallIPv4Name: mixedprotocoltest.Firewall([]*compute.FirewallAllowed{
@@ -96,6 +110,35 @@ func ForwardingRuleTCP(name string, ports []string) *compute.ForwardingRule {
 	}
 }
 
+// ForwardingRuleTCP returns a TCP Forwarding Rule with specified ports
+func ForwardingRuleTCPIPv6(name string, ports []string) *compute.ForwardingRule {
+	return &compute.ForwardingRule{
+		Name:                name,
+		Region:              "us-central1",
+		IPProtocol:          "TCP",
+		IpVersion:           "IPV6",
+		Ports:               ports,
+		BackendService:      "https://www.googleapis.com/compute/v1/projects/test-project/regions/us-central1/backendServices/k8s2-axyqjz2d-test-namespace-test-name-yuvhdy7i",
+		LoadBalancingScheme: "EXTERNAL",
+		NetworkTier:         "PREMIUM",
+		Description:         `{"networking.gke.io/service-name":"test-namespace/test-name"}`,
+	}
+}
+
+// ForwardingRuleL3 returns the L3 Forwarding Rule that sends all the traffic on given IP
+func ForwardingRuleL3(name string) *compute.ForwardingRule {
+	return &compute.ForwardingRule{
+		Name:                name,
+		Region:              "us-central1",
+		IPProtocol:          "L3_DEFAULT",
+		AllPorts:            true,
+		BackendService:      "https://www.googleapis.com/compute/v1/projects/test-project/regions/us-central1/backendServices/k8s2-axyqjz2d-test-namespace-test-name-yuvhdy7i",
+		LoadBalancingScheme: "EXTERNAL",
+		NetworkTier:         "PREMIUM",
+		Description:         `{"networking.gke.io/service-name":"test-namespace/test-name","networking.gke.io/api-version":"ga"}`,
+	}
+}
+
 // BackendService returns Backend Service for NetLB
 // protocol should be set to:
 // - `UNSPECIFIED` for mixed protocol (L3)
@@ -127,5 +170,18 @@ func HealthCheck() *composite.HealthCheck {
 		Version:            meta.VersionGA,
 		HttpHealthCheck:    &composite.HTTPHealthCheck{Port: 10256, RequestPath: "/healthz"},
 		Description:        `{"networking.gke.io/service-name":"","networking.gke.io/api-version":"ga","networking.gke.io/resource-description":"This resource is shared by all L4 XLB Services using ExternalTrafficPolicy: Cluster."}`,
+	}
+}
+
+// HealthCheckFirewallIPv6 returns Firewall for NetLB HealthCheck
+func HealthCheckFirewallIPv6() *compute.Firewall {
+	return &compute.Firewall{
+		Name:    mixedprotocoltest.HealthCheckFirewallIPv6Name,
+		Allowed: []*compute.FirewallAllowed{{IPProtocol: "TCP", Ports: []string{"10256"}}},
+		// GCE defined health check ranges
+		// https://cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges
+		SourceRanges: []string{"2600:1901:8001::/48"},
+		TargetTags:   []string{mixedprotocoltest.TestNode},
+		Description:  `{"networking.gke.io/service-name":"","networking.gke.io/api-version":"ga","networking.gke.io/resource-description":"This resource is shared by all L4  Services using ExternalTrafficPolicy: Cluster."}`,
 	}
 }
