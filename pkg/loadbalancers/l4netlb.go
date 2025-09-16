@@ -353,11 +353,6 @@ func (l4netlb *L4NetLB) provideBackendService(syncResult *L4NetLBSyncResult, hcL
 	bsName := l4netlb.namer.L4Backend(l4netlb.Service.Namespace, l4netlb.Service.Name)
 	servicePorts := l4netlb.Service.Spec.Ports
 
-	protocol := string(utils.GetProtocol(servicePorts))
-	if l4netlb.enableMixedProtocol {
-		protocol = backends.GetProtocol(servicePorts)
-	}
-
 	localityLbPolicy := l4netlb.determineBackendServiceLocalityPolicy()
 
 	connectionTrackingPolicy := l4netlb.connectionTrackingPolicy()
@@ -376,7 +371,7 @@ func (l4netlb *L4NetLB) provideBackendService(syncResult *L4NetLBSyncResult, hcL
 	backendParams := backends.L4BackendServiceParams{
 		Name:                     bsName,
 		HealthCheckLink:          hcLink,
-		Protocol:                 protocol,
+		Protocol:                 l4netlb.backendProtocol(servicePorts),
 		SessionAffinity:          string(l4netlb.Service.Spec.SessionAffinity),
 		Scheme:                   string(cloud.SchemeExternal),
 		NamespacedName:           l4netlb.NamespacedName,
@@ -405,6 +400,15 @@ func (l4netlb *L4NetLB) provideBackendService(syncResult *L4NetLBSyncResult, hcL
 	return bs.SelfLink
 }
 
+func (l4netlb *L4NetLB) backendProtocol(servicePorts []corev1.ServicePort) string {
+	switch {
+	case l4netlb.enableMixedProtocol:
+		return backends.GetProtocol(servicePorts)
+	default:
+		return string(utils.GetProtocol(servicePorts))
+	}
+}
+
 func (l4netlb *L4NetLB) ensureDualStackResources(result *L4NetLBSyncResult, nodeNames []string, bsLink string) {
 	if utils.NeedsIPv4(l4netlb.Service) {
 		l4netlb.ensureIPv4Resources(result, nodeNames, bsLink)
@@ -422,11 +426,6 @@ func (l4netlb *L4NetLB) ensureDualStackResources(result *L4NetLBSyncResult, node
 // - IPv4 Forwarding Rule
 // - IPv4 Firewall
 func (l4netlb *L4NetLB) ensureIPv4Resources(result *L4NetLBSyncResult, nodeNames []string, bsLink string) {
-	if l4netlb.enableMixedProtocol && forwardingrules.NeedsMixed(l4netlb.Service.Spec.Ports) {
-		l4netlb.ensureIPv4MixedResources(result, nodeNames, bsLink)
-		return
-	}
-
 	fr, ipAddrType, wasUpdate, err := l4netlb.ensureIPv4ForwardingRule(bsLink)
 	result.GCEResourceUpdate.SetForwardingRule(wasUpdate)
 	if err != nil {
@@ -436,11 +435,7 @@ func (l4netlb *L4NetLB) ensureIPv4Resources(result *L4NetLBSyncResult, nodeNames
 		result.MetricsLegacyState.IsUserError = IsUserError(err)
 		return
 	}
-	if fr.IPProtocol == string(corev1.ProtocolTCP) {
-		result.Annotations[annotations.TCPForwardingRuleKey] = fr.Name
-	} else {
-		result.Annotations[annotations.UDPForwardingRuleKey] = fr.Name
-	}
+	result.Annotations[forwardingrules.AnnotationKey(fr)] = fr.Name
 	result.MetricsLegacyState.IsManagedIP = ipAddrType == address.IPAddrManaged
 	result.MetricsLegacyState.IsPremiumTier = fr.NetworkTier == cloud.NetworkTierPremium.ToGCEValue()
 
@@ -451,43 +446,6 @@ func (l4netlb *L4NetLB) ensureIPv4Resources(result *L4NetLBSyncResult, nodeNames
 	}
 
 	result.Status = utils.AddIPToLBStatus(result.Status, fr.IPAddress)
-}
-
-func (l4netlb *L4NetLB) ensureIPv4MixedResources(result *L4NetLBSyncResult, nodeNames []string, bsLink string) {
-	res, err := l4netlb.mixedManager.EnsureIPv4(bsLink)
-
-	result.GCEResourceUpdate.SetForwardingRule(res.SyncStatus)
-	if err != nil {
-		// User can misconfigure the forwarding rule if Network Tier will not match service level Network Tier.
-		result.GCEResourceInError = annotations.ForwardingRuleResource
-		result.Error = fmt.Errorf("failed to ensure mixed protocol forwarding rules - %w", err)
-		result.MetricsLegacyState.IsUserError = IsUserError(err)
-		return
-	}
-
-	var ipAddr string
-	if res.UDPFwdRule != nil {
-		result.Annotations[annotations.UDPForwardingRuleKey] = res.UDPFwdRule.Name
-		if res.TCPFwdRule.NetworkTier == cloud.NetworkTierPremium.ToGCEValue() {
-			result.MetricsLegacyState.IsPremiumTier = true
-		}
-		ipAddr = res.UDPFwdRule.IPAddress
-	}
-	if res.TCPFwdRule != nil {
-		result.Annotations[annotations.TCPForwardingRuleKey] = res.TCPFwdRule.Name
-		if res.TCPFwdRule.NetworkTier == cloud.NetworkTierPremium.ToGCEValue() {
-			result.MetricsLegacyState.IsPremiumTier = true
-		}
-		ipAddr = res.TCPFwdRule.IPAddress
-	}
-
-	l4netlb.ensureIPv4NodesFirewall(nodeNames, ipAddr, result)
-	if result.Error != nil {
-		l4netlb.svcLogger.Error(err, "ensureIPv4MixedResources: Failed to ensure nodes firewall for L4 NetLB Service")
-		return
-	}
-
-	result.Status = utils.AddIPToLBStatus(result.Status, ipAddr)
 }
 
 func (l4netlb *L4NetLB) ensureIPv4NodesFirewall(nodeNames []string, ipAddress string, result *L4NetLBSyncResult) {

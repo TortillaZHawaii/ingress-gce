@@ -368,16 +368,6 @@ func (l4netlb *L4NetLB) ensureIPv4ForwardingRule(bsLink string) (*composite.Forw
 		}
 	}()
 
-	// Leaving this without feature flag, so after rollback
-	// forwarding rules will be cleaned up
-	mixedRulesExist := rules.TCP != nil || rules.UDP != nil
-	if mixedRulesExist {
-		if err := l4netlb.mixedManager.DeleteIPv4(); err != nil {
-			frLogger.Error(err, "l4netlb.mixedManager.DeleteIPv4 returned an error")
-			return nil, address.IPAddrUndefined, utils.ResourceResync, err
-		}
-	}
-
 	existingFwdRule := rules.Legacy
 	ipToUse := addrHandle.IP
 	isIPManaged := addrHandle.Managed
@@ -405,6 +395,12 @@ func (l4netlb *L4NetLB) ensureIPv4ForwardingRule(bsLink string) (*composite.Forw
 	if len(ports) <= maxForwardedPorts && flags.F.EnableDiscretePortForwarding {
 		newFwdRule.Ports = ports
 		newFwdRule.PortRange = ""
+	}
+
+	if l4netlb.enableMixedProtocol && forwardingrules.NeedsMixed(svcPorts) {
+		newFwdRule.Ports, newFwdRule.PortRange = nil, ""
+		newFwdRule.AllPorts = true
+		newFwdRule.IPProtocol = forwardingrules.ProtocolL3
 	}
 
 	if existingFwdRule != nil {

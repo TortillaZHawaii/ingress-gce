@@ -291,6 +291,11 @@ func (l4netlb *L4NetLB) buildExpectedIPv6ForwardingRule(bsLink, ipv6AddressToUse
 		fr.Ports = utils.GetPorts(svcPorts)
 		fr.PortRange = ""
 	}
+	if l4netlb.enableMixedProtocol && forwardingrules.NeedsMixed(svcPorts) {
+		fr.Ports, fr.PortRange = nil, ""
+		fr.AllPorts = true
+		fr.IPProtocol = forwardingrules.ProtocolL3
+	}
 
 	return fr, nil
 }
