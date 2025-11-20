@@ -78,6 +78,14 @@ func (frc *ForwardingRules) Delete(name string) error {
 		return fmt.Errorf("Failed to create key for deleting forwarding rule %s, err: %w", name, err)
 	}
 	err = composite.DeleteForwardingRule(frc.cloud, key, frc.version, frc.logger)
+	if utils.IsInUseByPSC(err) {
+		return utils.NewUserError(fmt.Errorf(
+			"Failed to delete forwarding rule %q due to a service attachment being used, for more information visit %q, err: %w",
+			name,
+			"https://docs.cloud.google.com/kubernetes-engine/docs/how-to/internal-load-balancing-across-vpc-net#requirements_and_limitations",
+			err,
+		))
+	}
 	if utils.IgnoreHTTPNotFound(err) != nil {
 		return fmt.Errorf("Failed to delete forwarding rule %s, err: %w", name, err)
 	}

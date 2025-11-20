@@ -1,6 +1,7 @@
-package forwardingrules
+package forwardingrules_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -9,8 +10,11 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/api/googleapi"
 	"k8s.io/cloud-provider-gcp/providers/gce"
 	"k8s.io/ingress-gce/pkg/composite"
+	"k8s.io/ingress-gce/pkg/forwardingrules"
+	"k8s.io/ingress-gce/pkg/loadbalancers"
 	"k8s.io/ingress-gce/pkg/utils"
 	"k8s.io/klog/v2"
 )
@@ -39,7 +43,7 @@ func TestCreateForwardingRule(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
-			frc := New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+			frc := forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
 
 			err := frc.Create(tc.frRule)
 			if err != nil {
@@ -97,7 +101,7 @@ func TestGetForwardingRule(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
-			frc := New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+			frc := forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
 			mustCreateForwardingRules(t, fakeGCE, tc.existingFwdRules)
 
 			fr, err := frc.Get(tc.getFwdRuleName)
@@ -205,7 +209,7 @@ func TestListForwardingRules(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			// Arrange
 			fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
-			frc := New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+			frc := forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
 			mustCreateForwardingRules(t, fakeGCE, tc.existingFwdRules)
 
 			// Act
@@ -272,7 +276,7 @@ func TestDeleteForwardingRule(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
-			frc := New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+			frc := forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
 			mustCreateForwardingRules(t, fakeGCE, tc.existingFwdRules)
 
 			err := frc.Delete(tc.deleteFwdRuleName)
@@ -291,6 +295,37 @@ func TestDeleteForwardingRule(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDeleteForwardingRuleWithPSC(t *testing.T) {
+	t.Parallel()
+	// Arrange
+	fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
+	frc := forwardingrules.New(fakeGCE, meta.VersionGA, meta.Regional, klog.TODO())
+	mustCreateForwardingRule(t, fakeGCE, &composite.ForwardingRule{Name: "k8s2-ilb-psc-rule"})
+	mockGCE := fakeGCE.Compute().(*cloud.MockGCE)
+	mockGCE.MockForwardingRules.DeleteHook = func(ctx context.Context, key *meta.Key, m *cloud.MockForwardingRules, options ...cloud.Option) (bool, error) {
+		if key.Name == "k8s2-ilb-psc-rule" {
+			return true, &googleapi.Error{
+				Code: 400,
+				Errors: []googleapi.ErrorItem{
+					{
+						Reason:  "resourceInUseByAnotherResource",
+						Message: "The forwarding_rule resource 'REGION:us-central1/PROJECT:123456/FORWARDING_RULE:k8s2-ilb-psc-rule' is already being used by 'REGION:us-central1/PROJECT:123456/SERVICE_ATTACHMENT:my-psc-attachment'",
+					},
+				},
+			}
+		}
+		return false, nil
+	}
+
+	// Act
+	err := frc.Delete("k8s2-ilb-psc-rule")
+
+	// Assert
+	if !loadbalancers.IsUserError(err) {
+		t.Errorf("want %v to be user error", err)
 	}
 }
 

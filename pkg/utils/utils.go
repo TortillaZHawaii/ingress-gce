@@ -187,8 +187,9 @@ const (
 	// AffinityTypeNone - no session affinity.
 	gceAffinityTypeNone = "NONE"
 	// AffinityTypeClientIP - affinity based on Client IP.
-	gceAffinityTypeClientIP = "CLIENT_IP"
-	gceRateLimitExceeded    = "rateLimitExceeded"
+	gceAffinityTypeClientIP           = "CLIENT_IP"
+	gceRateLimitExceeded              = "rateLimitExceeded"
+	gceResourceInUseByAnotherResource = "resourceInUseByAnotherResource"
 )
 
 // IsHTTPErrorCode checks if the given error matches the given HTTP Error code.
@@ -298,6 +299,20 @@ func IsNotFoundError(err error) bool {
 // IsForbiddenError returns true if the operation was forbidden
 func IsForbiddenError(err error) bool {
 	return IsHTTPErrorCode(err, http.StatusForbidden)
+}
+
+// IsInUseByPSC returns true if the error is caused by a resource being used by a service attachment
+func IsInUseByPSC(err error) bool {
+	var apiErr *googleapi.Error
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	for _, e := range apiErr.Errors {
+		if e.Reason == gceResourceInUseByAnotherResource && strings.Contains(e.Message, "SERVICE_ATTACHMENT") {
+			return true
+		}
+	}
+	return false
 }
 
 // IsQuotaExceededError returns true if the quota was exceeded
