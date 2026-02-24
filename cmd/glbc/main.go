@@ -40,9 +40,9 @@ import (
 	"k8s.io/ingress-gce/pkg/frontendconfig"
 	frontendconfigclient "k8s.io/ingress-gce/pkg/frontendconfig/client/clientset/versioned"
 	"k8s.io/ingress-gce/pkg/instancegroups"
-	"k8s.io/ingress-gce/pkg/l4lb"
-	"k8s.io/ingress-gce/pkg/l4lbconfig"
-	l4lbconfigclient "k8s.io/ingress-gce/pkg/l4lbconfig/client/clientset/versioned"
+	"k8s.io/ingress-gce/pkg/l4/l4lb"
+	"k8s.io/ingress-gce/pkg/l4/l4lbconfig"
+	l4lbconfigclient "k8s.io/ingress-gce/pkg/l4/l4lbconfig/client/clientset/versioned"
 	multiprojectgce "k8s.io/ingress-gce/pkg/multiproject/common/gce"
 	multiprojectstart "k8s.io/ingress-gce/pkg/multiproject/start"
 	"k8s.io/ingress-gce/pkg/network"
@@ -73,8 +73,10 @@ import (
 	"k8s.io/ingress-gce/pkg/version"
 )
 
-const negLockName = "ingress-gce-neg-lock"
-const l4LockName = "l4-lb-controller-gce-lock"
+const (
+	negLockName = "ingress-gce-neg-lock"
+	l4LockName  = "l4-lb-controller-gce-lock"
+)
 
 func main() {
 	flags.Setup()

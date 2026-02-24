@@ -24,7 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
-	networkingv1 "k8s.io/ingress-gce/pkg/l4lbconfig/client/clientset/versioned/typed/l4lbconfig/v1"
+	networkingv1 "k8s.io/ingress-gce/pkg/l4/l4lbconfig/client/clientset/versioned/typed/l4lbconfig/v1"
 )
 
 type Interface interface {
