@@ -352,6 +352,7 @@ func main() {
 		EnableL4NetLBNEGsDefault:             flags.F.EnableL4NetLBNEGDefault,
 		EnableL4ILBMixedProtocol:             flags.F.EnableL4ILBMixedProtocol,
 		EnableL4NetLBMixedProtocol:           flags.F.EnableL4NetLBMixedProtocol,
+		UseL3ForMixedProtocol:                flags.F.UseL3ForwardingRuleForNetLBMixedProtocol,
 		EnableL4DenyFirewalls:                flags.F.EnableL4DenyFirewall,
 		EnableL4DenyFirewallsRollbackCleanup: flags.F.EnableL4DenyFirewallRollbackCleanup,
 		EnableL4ILBZonalAffinity:             flags.F.EnableL4ILBZonalAffinity,

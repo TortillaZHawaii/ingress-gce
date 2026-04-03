@@ -14,3 +14,27 @@ func IPv4Ingress() []api_v1.LoadBalancerIngress {
 		},
 	}
 }
+
+func IPv6Ingress() []api_v1.LoadBalancerIngress {
+	mode := api_v1.LoadBalancerIPModeVIP
+	return []api_v1.LoadBalancerIngress{
+		{
+			IP:     IPv6Address,
+			IPMode: &mode,
+		},
+	}
+}
+
+func DualStackIngress() []api_v1.LoadBalancerIngress {
+	mode := api_v1.LoadBalancerIPModeVIP
+	return []api_v1.LoadBalancerIngress{
+		{
+			IP:     IPv4Address,
+			IPMode: &mode,
+		},
+		{
+			IP:     IPv6Address,
+			IPMode: &mode,
+		},
+	}
+}

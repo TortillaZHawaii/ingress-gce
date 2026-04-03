@@ -141,6 +141,7 @@ var F = struct {
 	ProviderConfigNameLabelKey               string
 	EnableL4ILBMixedProtocol                 bool
 	EnableL4NetLBMixedProtocol               bool
+	UseL3ForwardingRuleForNetLBMixedProtocol bool
 	EnableL4DenyFirewall                     bool
 	EnableL4DenyFirewallRollbackCleanup      bool
 	EnableIPV6OnlyNEG                        bool
@@ -356,6 +357,7 @@ L7 load balancing. CSV values accepted. Example: -node-port-ranges=80,8080,400-5
 	flag.BoolVar(&F.EnableMultiProjectMode, "enable-multi-project-mode", false, "Enable running in multi-project mode.")
 	flag.BoolVar(&F.EnableL4ILBMixedProtocol, "enable-l4ilb-mixed-protocol", false, "Enable support for mixed protocol L4 internal load balancers.")
 	flag.BoolVar(&F.EnableL4NetLBMixedProtocol, "enable-l4netlb-mixed-protocol", false, "Enable support for mixed protocol L4 external load balancers.")
+	flag.BoolVar(&F.UseL3ForwardingRuleForNetLBMixedProtocol, "use-default-l3-for-netlb-mixed-protocol", false, "Enable support for mixed protocol L4 external load balancers using L3_DEFAULT forwarding rule. This has multiple benefits over the previous NetLB mixed protocol implementation, including lower cost and no traffic interruption on mixed-to-mixed port changes. This flag will eventually be a default implementation for --enable-l4netlb-mixed-protocol.")
 	flag.BoolVar(&F.EnableL4DenyFirewall, "enable-l4-deny-firewall", false, "Enable creation and updates of Deny VPC Firewall Rules for L4 external load balancers. Requires --enable-pinhole and --enable-l4-deny-firewall-rollback-cleanup to be true.")
 	flag.BoolVar(&F.EnableL4DenyFirewallRollbackCleanup, "enable-l4-deny-firewall-rollback-cleanup", false, "Enable cleanup codepath of the deny firewalls for rollback. The reason for it not being enabled by default is the additional GCE API calls that are made for checking if the deny firewalls exist/deletion which will eat up the quota unnecessarily.")
 	flag.StringVar(&F.ProviderConfigNameLabelKey, "provider-config-name-label-key", "cloud.gke.io/provider-config-name", "The label key for provider-config name, which is used to identify the provider-config of objects in multi-project mode.")
@@ -387,6 +389,10 @@ func Validate() {
 
 	if F.EnableL4DenyFirewall && (!F.EnablePinhole || !F.EnableL4DenyFirewallRollbackCleanup) {
 		klog.Fatalf("The flag --enable-l4-deny-firewall requires --enable-pinhole and --enable-l4-deny-firewall-rollback-cleanup to be true.")
+	}
+
+	if F.UseL3ForwardingRuleForNetLBMixedProtocol && !F.EnableL4NetLBMixedProtocol {
+		klog.Fatalf("The flag --use-l3-forwarding-rule-for-netlb-mixed-protocol requires --enable-l4netlb-mixed-protocol to be true.")
 	}
 }
 
