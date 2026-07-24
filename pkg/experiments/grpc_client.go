@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/local"
 	"k8s.io/ingress-gce/pkg/experiments/grpc/pb"
 	"k8s.io/klog/v2"
 )
@@ -33,7 +33,7 @@ func NewGRPCClientWithTimeout(socketPath string, logger klog.Logger, timeout tim
 	conn, err := grpc.NewClient(
 		"passthrough:///unix",
 		grpc.WithContextDialer(dialer),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(local.NewCredentials()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gRPC client for unix socket %s: %w", socketPath, err)

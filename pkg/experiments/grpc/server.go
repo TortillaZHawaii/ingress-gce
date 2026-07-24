@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/local"
 	"k8s.io/ingress-gce/pkg/experiments"
 	"k8s.io/ingress-gce/pkg/experiments/grpc/pb"
 	"k8s.io/klog/v2"
@@ -39,7 +40,7 @@ func (s *Server) StartOnUnixSocket(socketPath string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to listen on unix socket %s: %w", socketPath, err)
 	}
 
-	s.grpcServer = grpc.NewServer()
+	s.grpcServer = grpc.NewServer(grpc.Creds(local.NewCredentials()))
 	pb.RegisterExperimentsServer(s.grpcServer, s)
 
 	go func() {
